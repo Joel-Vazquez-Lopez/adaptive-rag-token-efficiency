@@ -81,7 +81,7 @@ They answer the question:
 
 `fixed_10_full` is the main expensive baseline.
 
-### 4b. Planned Heuristic Adaptive Baseline
+### 4b. Planned Heuristic Adaptive Model
 
 ### TODO MAIN IDEA SO FAR
 
