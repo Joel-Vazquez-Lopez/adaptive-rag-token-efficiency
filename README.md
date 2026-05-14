@@ -418,6 +418,16 @@ docs/CODE_WALKTHROUGH.md
 | `time_reduction_vs_top10` | Time saving compared with fixed top-10 |
 | `fallback_rate` | How often Safe Adaptive expanded to full top-10 |
 
+
+| Category | Metric | What It Shows |
+|---|---|---|
+| `Retrieval quality` | nDCG@10 | Are relevant documents ranked high? |
+| `Answer quality` | Token F1 | Does the generated answer overlap with the reference? |
+| `Efficiency` | Total tokens | How expensive is the context and generation? |
+| `Efficiency` | Token reduction | How much token usage is reduced compared with fixed top-10? |
+| `Latency` | Generation time | Is the method faster or slower? |
+| `Safety behavior` | Fallback rate | How often does Safe Adaptive expand to more context? |
+
 ## Important Note
 
 Token F1 is useful but imperfect. It measures lexical overlap, so correct paraphrases can still score low. In addition for that we also evaluate nDCG@10 to measure whether relevant documents appear high in the ranked list. 
