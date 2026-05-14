@@ -8,7 +8,6 @@ The important method is:
 
 > **Safe Adaptive Context**: answer first with compact evidence, check whether the answer looks risky, and only then expand to full top-10 context.
 
-This is the actual model from our research pipeline, not a simplified replacement.
 
 ## What The Pipeline Does
 
@@ -78,7 +77,7 @@ They answer the question:
 
 ### 4b. Planned Heuristic Adaptive Baseline
 
-A teammate may add a heuristic adaptive controller.
+### TODO MAIN IDEA SO FAR
 
 This method would use simple rules, such as query length and retrieval score,
 to choose k before generation.
@@ -210,94 +209,6 @@ outputs/<run_name>/final_table.csv
 | Basic Adaptive + Compact Evidence | `learned_budget_evidence_ngram_neighbors` | Predict a budget, then send compact evidence spans |
 | Safe Adaptive Context | `answer_aware_fallback` | Try compact adaptive evidence first; expand to full top-10 only if the answer looks weak |
 
-## Team Method Structure
-
-The final group project can be organized as a progression of systems:
-
-| Group | Method | Purpose |
-|---|---|---|
-| Baseline | No Retrieval | Checks what Mistral can answer without RAG |
-| Baseline | Fixed Top-k | Standard RAG comparison using fixed context size |
-| Teammate Method | Heuristic Adaptive | Tests whether simple hand-written rules can choose context size |
-| Adaptive Method | Basic Adaptive + Compact Evidence | Tests learned budget prediction plus evidence compression |
-| My Main Method | Safe Adaptive Context | Adds answer-aware fallback to protect quality |
-
-The current GitHub version includes the fixed baselines, Basic Adaptive, and
-Safe Adaptive so the system can already be tested end-to-end.
-
-The heuristic adaptive method is listed as a planned teammate-owned module. It
-can be added later without changing the overall evaluation table.
-
-Example heuristic idea:
-
-```text
-if retrieval score is too low:
-    use k = 0
-elif query is short:
-    use k = 3
-elif top document is clearly dominant:
-    use k = 5
-else:
-    use k = 8 or 10
-```
-
-This is useful because it gives a clear comparison:
-
-> Are learned/safe adaptive methods better than simple hand-written rules?
-
-## About A "Full Corpus" Baseline
-
-We discussed a baseline that does not use top-k at all and instead sends the
-whole corpus to the LLM.
-
-Conceptually, this is useful because it represents "give the model everything."
-But in practice it is usually not runnable:
-
-- SciFact has 5,183 abstracts.
-- The full corpus is far larger than Mistral's practical context window.
-- It would be extremely slow and token-expensive.
-- It is not how normal RAG systems are deployed.
-
-Because of that, the practical expensive baseline is `fixed_10_full`.
-It means:
-
-> retrieve the top-10 documents and send all 10 full documents to the model.
-
-In the report, we can mention the full-corpus baseline as a theoretical upper
-context baseline, but the real comparison should use fixed top-10 as the
-realistic "large context" baseline.
-
-## What Safe Adaptive Context Does
-
-The Safe Adaptive model is implemented in:
-
-```text
-src/adaptive_retrieval/llm_budget.py
-```
-
-Function:
-
-```text
-answer_aware_fallback_run(...)
-```
-
-It works like this:
-
-1. Retrieve top-10 documents.
-2. Use the sequential adaptive budget to decide the first context size.
-3. Compress the selected documents with `evidence_ngram_neighbors`.
-4. Ask Mistral to answer.
-5. Check if the answer looks weak:
-   - empty answer
-   - says insufficient evidence
-   - says cannot determine
-   - very short answer
-   - low overlap with evidence
-   - low overlap with the query
-6. If risky, run again with full top-10 context.
-7. Report both answer quality and total token cost.
-
-This is why it is called "safe": it tries to save tokens, but it has a quality-protection fallback.
 
 ## Folder Structure
 
@@ -354,6 +265,7 @@ datasets:
 
 These datasets are not required for the core submission, but they would make the
 project stronger because they test generalization beyond one dataset.
+We may need to use other datasets to prove if is able to generalize. 
 
 ## Install
 
@@ -436,9 +348,6 @@ The runner also has:
 --seed 0
 ```
 
-This makes the Python-side experiment deterministic. The model is also called
-with temperature `0.0`.
-
 Important caveat:
 
 With the same code, same query file, same seed, same Ollama version, same Mistral
@@ -511,4 +420,4 @@ docs/CODE_WALKTHROUGH.md
 
 ## Important Note
 
-Token F1 is useful but imperfect. It measures lexical overlap, so correct paraphrases can still score low. That is why the report should discuss this limitation.
+Token F1 is useful but imperfect. It measures lexical overlap, so correct paraphrases can still score low. In addition for that we also evaluate nDCG@10 to measure whether relevant documents appear high in the ranked list. 
