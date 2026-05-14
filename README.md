@@ -8,6 +8,12 @@ The important method is:
 
 > **Safe Adaptive Context**: answer first with compact evidence, check whether the answer looks risky, and only then expand to full top-10 context.
 
+## Contributors
+
+- Andreia Alexa
+- Simon Backhaus Brudzewski
+- Karlis Martins Auce
+- Joel Vazquez
 
 ## What The Pipeline Does
 
