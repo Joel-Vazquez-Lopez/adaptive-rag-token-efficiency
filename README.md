@@ -210,8 +210,9 @@ outputs/<run_name>/final_table.csv
 | No Retrieval | `no_retrieval` | Closed-book baseline; Mistral answers without retrieved documents |
 | Fixed Top-3 | `fixed_3_full` | Always send 3 full documents |
 | Fixed Top-5 | `fixed_5_full` | Always send 5 full documents |
+| Fixed Top-7 | `fixed_7_full` | Always send 7 full documents |
 | Fixed Top-10 | `fixed_10_full` | Always send 10 full documents; expensive baseline |
-| Heuristic Adaptive | planned teammate module | Rule-based controller using query/retrieval signals |
+| Heuristic Rules | `heuristic_rules_full` | Rule-based controller using query length and retrieval score gaps |
 | Basic Adaptive + Compact Evidence | `learned_budget_evidence_ngram_neighbors` | Predict a budget, then send compact evidence spans |
 | Safe Adaptive Context | `answer_aware_fallback` | Try compact adaptive evidence first; expand to full top-10 only if the answer looks weak |
 

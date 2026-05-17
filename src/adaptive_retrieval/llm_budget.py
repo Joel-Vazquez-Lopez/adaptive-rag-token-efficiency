@@ -839,12 +839,18 @@ def method_display_name(mode: str, budget_mode: str, compression_mode: str) -> s
     if mode == PRE_GENERATION_ROUTING_MODE:
         return "Risk-Routed Context"
 
+    if budget_mode == "no_retrieval":
+        return "No Retrieval"
     if budget_mode == "fixed_3":
         return "Fixed Small Context" if compression_mode == "full" else "Fixed Small + Compact Evidence"
     if budget_mode == "fixed_5":
         return "Fixed Medium Context" if compression_mode == "full" else "Fixed Medium + Compact Evidence"
+    if budget_mode == "fixed_7":
+        return "Fixed Large Context" if compression_mode == "full" else "Fixed Large + Compact Evidence"
     if budget_mode == "fixed_10":
         return "Fixed Full Context" if compression_mode == "full" else "Compressed Fixed Full Context"
+    if budget_mode == "heuristic_rules":
+        return "Heuristic Rules" if compression_mode == "full" else "Heuristic Rules + Compact Evidence"
 
     if budget_mode == "learned_budget":
         return "Basic Adaptive Budget" if compression_mode == "full" else "Basic Adaptive + Compact Evidence"
@@ -871,9 +877,26 @@ def selected_docs_for_mode(
     sequential_budget: int,
     oracle_budget: int,
 ) -> list[Document]:
+    if mode == "no_retrieval":
+        return []
     # Fixed modes pass the first k retrieved documents.
     if mode.startswith("fixed_"):
         budget = int(mode.removeprefix("fixed_"))
+    # heuristic_rules is the simple hand-written baseline:
+    # if the ranking is confident after 3 or 5 documents, stop early;
+    # otherwise keep 7 documents. This is intentionally explainable.
+    elif mode == "heuristic_rules":
+        scores = [score for _doc, score in ranked_docs[:10]]
+        top_score = scores[0] if scores else 0.0
+        gap_3_to_4 = (scores[2] - scores[3]) / top_score if len(scores) > 3 and top_score > 0 else 0.0
+        gap_5_to_6 = (scores[4] - scores[5]) / top_score if len(scores) > 5 and top_score > 0 else 0.0
+        query_length = len(tokenize(query.text))
+        if gap_3_to_4 >= 0.10 and query_length <= 12:
+            budget = 3
+        elif gap_5_to_6 >= 0.05:
+            budget = 5
+        else:
+            budget = 7
     # learned_budget uses the budget predicted by the robust binary controller.
     elif mode == "learned_budget":
         budget = predicted_budget

@@ -37,19 +37,14 @@ METHODS_TO_RUN = [
 
 Meaning:
 
+- `no_retrieval`: closed-book baseline, k = 0
 - `fixed_3`: always use top-3 full documents
 - `fixed_5`: always use top-5 full documents
+- `fixed_7`: always use top-7 full documents
 - `fixed_10`: always use top-10 full documents
+- `heuristic_rules`: choose k with simple query-length and score-gap rules
 - `learned_budget`: basic adaptive budget model
 - `answer_aware_fallback`: our Safe Adaptive model
-
-The project plan also includes:
-
-- `no_retrieval`: closed-book baseline, k = 0
-- `heuristic_adaptive`: planned teammate method based on hand-written rules
-
-Those methods fit naturally into the final comparison table, even if the
-heuristic module is added later by a teammate.
 
 The final clean table is created by:
 
