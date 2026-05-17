@@ -109,6 +109,7 @@ def build_final_table(answer_summary, dataset_name):
                 "dataset": dataset_name,
                 "method": method_name,
                 "code_mode": mode,
+                "ndcg_at_10": round(as_float(row, "ndcg_at_10"), 6),
                 "answer_f1": round(f1, 6),
                 "f1_retained_vs_top10": percent(f1 / baseline_f1 if baseline_f1 else 0),
                 "total_tokens": round(tokens, 2),

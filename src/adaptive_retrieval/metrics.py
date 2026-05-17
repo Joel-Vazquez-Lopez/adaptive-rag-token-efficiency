@@ -14,6 +14,9 @@ Important metrics:
 - reciprocal_rank / MRR:
   Did a relevant document appear near the top?
 
+- ndcg_at_k:
+  Are relevant documents ranked high in the selected context?
+
 - token_f1:
   Word-overlap F1 between generated answer and reference text.
 
@@ -40,6 +43,7 @@ class RunMetrics:
     precision_at_k: float
     recall: float
     mrr: float
+    ndcg_at_10: float
     docs_used: int
     tokens_used: int
     context_precision: float
@@ -65,6 +69,25 @@ def reciprocal_rank(ranked_doc_ids: list[str], relevant_doc_ids: frozenset[str])
         if doc_id in relevant_doc_ids:
             return 1 / index
     return 0.0
+
+
+def ndcg_at_k(ranked_doc_ids: list[str], relevant_doc_ids: frozenset[str], k: int = 10) -> float:
+    if not relevant_doc_ids:
+        return 0.0
+
+    gains = [1.0 if doc_id in relevant_doc_ids else 0.0 for doc_id in ranked_doc_ids[:k]]
+    dcg = sum(gain / math_log2(rank + 2) for rank, gain in enumerate(gains))
+
+    ideal_relevant = min(len(relevant_doc_ids), k)
+    ideal_dcg = sum(1.0 / math_log2(rank + 2) for rank in range(ideal_relevant))
+    return dcg / ideal_dcg if ideal_dcg else 0.0
+
+
+def math_log2(value: int) -> float:
+    # Tiny wrapper keeps ndcg_at_k readable without importing all of math at call sites.
+    import math
+
+    return math.log2(value)
 
 
 def token_f1(candidate: str, reference: str) -> float:

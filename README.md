@@ -394,7 +394,7 @@ outputs/<run_name>/final_table.csv
 | `src/adaptive_retrieval/budget_experiment.py` | Small helper for retrieval-side budget metrics |
 | `src/adaptive_retrieval/learned_budget.py` | Basic adaptive budget predictor |
 | `src/adaptive_retrieval/llm_budget.py` | Main LLM pipeline and Safe Adaptive Context model |
-| `src/adaptive_retrieval/metrics.py` | Token F1, coverage, precision, recall, MRR |
+| `src/adaptive_retrieval/metrics.py` | Token F1, coverage, precision, recall, MRR, nDCG@10 |
 
 The file to understand first is:
 
