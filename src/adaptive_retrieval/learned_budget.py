@@ -702,7 +702,7 @@ def summarize(metrics: list[RunMetrics]) -> list[dict[str, object]]:
                 "mode": mode,
                 "precision_at_k": round(sum(row.precision_at_k for row in selected) / count, 6),
                 "recall": round(sum(row.recall for row in selected) / count, 6),
-                "mrr": round(sum(row.mrr for row in selected) / count, 6),
+                "mrr_at_10": round(sum(row.mrr for row in selected) / count, 6),
                 "ndcg_at_10": round(sum(row.ndcg_at_10 for row in selected) / count, 6),
                 "docs_used": round(sum(row.docs_used for row in selected) / count, 6),
                 "tokens_used": round(sum(row.tokens_used for row in selected) / count, 6),
