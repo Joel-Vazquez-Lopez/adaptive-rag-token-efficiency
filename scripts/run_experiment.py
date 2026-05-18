@@ -50,9 +50,12 @@ from adaptive_retrieval.llm_budget import LLMConfig, run_llm_budget_experiment, 
 # learned_budget is the basic adaptive model.
 # answer_aware_fallback is our stronger Safe Adaptive model.
 METHODS_TO_RUN = [
+    "no_retrieval",
     "fixed_3",
     "fixed_5",
+    "fixed_7",
     "fixed_10",
+    "heuristic_rules",
     "learned_budget",
     "answer_aware_fallback",
 ]
@@ -61,9 +64,12 @@ METHODS_TO_RUN = [
 # The real experiment outputs several rows because it tests full context and compact evidence.
 # These are the exact rows we want to show as the clean comparison.
 FINAL_TABLE_ROWS = {
+    "no_retrieval_full": "No Retrieval",
     "fixed_3_full": "Fixed Top-3",
     "fixed_5_full": "Fixed Top-5",
+    "fixed_7_full": "Fixed Top-7",
     "fixed_10_full": "Fixed Top-10",
+    "heuristic_rules_full": "Heuristic Rules",
     "learned_budget_evidence_ngram_neighbors": "Basic Adaptive + Compact Evidence",
     "answer_aware_fallback": "Safe Adaptive Context",
 }
@@ -103,6 +109,8 @@ def build_final_table(answer_summary, dataset_name):
                 "dataset": dataset_name,
                 "method": method_name,
                 "code_mode": mode,
+                "ndcg_at_10": round(as_float(row, "ndcg_at_10"), 6),
+                "mrr_at_10": round(as_float(row, "mrr_at_10"), 6),
                 "answer_f1": round(f1, 6),
                 "f1_retained_vs_top10": percent(f1 / baseline_f1 if baseline_f1 else 0),
                 "total_tokens": round(tokens, 2),

@@ -3,7 +3,7 @@
 Run the experiment from the project root:
 
 ```bash
-python3 scripts/run_experiment.py --dry-run --max-queries 5 --output-dir outputs/dry_run
+python3 scripts/run_experiment.py --dry-run --max-eval-queries 5 --output-dir outputs/dry_run
 ```
 
 Use Ollama/Mistral:
@@ -12,7 +12,7 @@ Use Ollama/Mistral:
 python3 scripts/run_experiment.py \
   --model mistral \
   --api-url http://localhost:11434/v1 \
-  --max-queries 50 \
+  --max-eval-queries 50 \
   --require-provider-tokens \
   --output-dir outputs/scifact_mistral_50
 ```

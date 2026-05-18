@@ -27,6 +27,7 @@ from adaptive_retrieval.metrics import (
     answer_coverage,
     precision_at_k,
     recall,
+    ndcg_at_k,
     reciprocal_rank,
     token_f1,
 )
@@ -62,6 +63,7 @@ def _record_metrics(
         precision_at_k=context_precision,
         recall=recall(selected_doc_ids, query.relevant_doc_ids),
         mrr=reciprocal_rank(ranked_doc_ids, query.relevant_doc_ids),
+        ndcg_at_10=ndcg_at_k(selected_doc_ids, query.relevant_doc_ids, k=10),
         docs_used=len(selected_doc_ids),
         tokens_used=tokens_used,
         context_precision=context_precision,
@@ -69,4 +71,3 @@ def _record_metrics(
         answer_f1=token_f1(context, query.reference_answer),
         answer_coverage=answer_coverage(context, query.reference_answer),
     )
-
