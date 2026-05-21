@@ -56,7 +56,7 @@ from adaptive_retrieval.learned_budget import (
     summarize as summarize_retrieval_metrics,
     train_centroid_model,
 )
-from adaptive_retrieval.metrics import answer_coverage, ndcg_at_k, token_f1
+from adaptive_retrieval.metrics import answer_coverage, ndcg_at_k, semantic_similarity, token_f1
 from adaptive_retrieval.text import estimate_tokens, tokenize
 
 PROMPT_STYLES = {"default", "concise", "anchor"}
@@ -191,6 +191,8 @@ class LLMRunRow:
     answer_f1: float
     # Reference-answer term coverage by the generated answer.
     answer_coverage: float
+    # Sentence-transformer cosine similarity between generated and reference answers.
+    semantic_similarity: float
     # nDCG@10 of the documents that enter the prompt/context.
     ndcg_at_10: float
     # MRR@10 of the documents that enter the prompt/context.
@@ -1022,6 +1024,7 @@ def run_llm_budget_experiment(
                         generation_time_ms=answer.generation_time_ms,
                         answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
                         answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
                         ndcg_at_10=context_ndcg_at_10(selected_docs, query),
                         mrr_at_10=context_mrr_at_10(selected_docs, query),
                         selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
@@ -1060,6 +1063,7 @@ def run_llm_budget_experiment(
                         generation_time_ms=answer.generation_time_ms,
                         answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
                         answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
                         ndcg_at_10=context_ndcg_at_10(selected_docs, query),
                         mrr_at_10=context_mrr_at_10(selected_docs, query),
                         selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
@@ -1111,6 +1115,7 @@ def run_llm_budget_experiment(
                         generation_time_ms=answer.generation_time_ms,
                         answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
                         answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
                         ndcg_at_10=context_ndcg_at_10(selected_docs, query),
                         mrr_at_10=context_mrr_at_10(selected_docs, query),
                         selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
@@ -1155,6 +1160,7 @@ def summarize_llm_rows(rows: list[LLMRunRow]) -> list[dict[str, object]]:
                 "fallback_tokens": round(average(row.fallback_tokens for row in selected), 6),
                 "answer_f1": round(average(row.answer_f1 for row in selected), 6),
                 "answer_coverage": round(average(row.answer_coverage for row in selected), 6),
+                "semantic_similarity": round(average(row.semantic_similarity for row in selected), 6),
                 "ndcg_at_10": round(average(row.ndcg_at_10 for row in selected), 6),
                 "mrr_at_10": round(average(row.mrr_at_10 for row in selected), 6),
             }

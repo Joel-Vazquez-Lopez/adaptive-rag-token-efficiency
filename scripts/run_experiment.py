@@ -92,6 +92,7 @@ def build_final_table(answer_summary, dataset_name):
     baseline = row_by_mode["fixed_10_full"]
 
     baseline_f1 = as_float(baseline, "answer_f1")
+    baseline_semantic_similarity = as_float(baseline, "semantic_similarity")
     baseline_tokens = as_float(baseline, "total_tokens")
     baseline_time = as_float(baseline, "generation_time_ms")
 
@@ -100,6 +101,8 @@ def build_final_table(answer_summary, dataset_name):
         row = row_by_mode[mode]
 
         f1 = as_float(row, "answer_f1")
+        coverage = as_float(row, "answer_coverage")
+        similarity = as_float(row, "semantic_similarity")
         tokens = as_float(row, "total_tokens")
         time_ms = as_float(row, "generation_time_ms")
         fallback_rate = as_float(row, "fallback_rate")
@@ -113,6 +116,11 @@ def build_final_table(answer_summary, dataset_name):
                 "mrr_at_10": round(as_float(row, "mrr_at_10"), 6),
                 "answer_f1": round(f1, 6),
                 "f1_retained_vs_top10": percent(f1 / baseline_f1 if baseline_f1 else 0),
+                "answer_coverage": round(coverage, 6),
+                "semantic_similarity": round(similarity, 6),
+                "semantic_similarity_retained_vs_top10": percent(
+                    similarity / baseline_semantic_similarity if baseline_semantic_similarity else 0
+                ),
                 "total_tokens": round(tokens, 2),
                 "token_reduction_vs_top10": percent(1 - (tokens / baseline_tokens) if baseline_tokens else 0),
                 "generation_time_ms": round(time_ms, 2),

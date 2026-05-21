@@ -31,8 +31,11 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from functools import lru_cache
 
 from adaptive_retrieval.text import tokenize
+
+SEMANTIC_SIMILARITY_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 @dataclass
@@ -113,3 +116,22 @@ def answer_coverage(candidate: str, reference: str) -> float:
     if not reference_terms:
         return 0.0
     return len(candidate_terms & reference_terms) / len(reference_terms)
+
+
+@lru_cache(maxsize=1)
+def semantic_similarity_model():
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(SEMANTIC_SIMILARITY_MODEL)
+
+
+def semantic_similarity(candidate: str, reference: str) -> float:
+    if not candidate.strip() or not reference.strip():
+        return 0.0
+
+    model = semantic_similarity_model()
+    candidate_embedding, reference_embedding = model.encode(
+        [candidate, reference],
+        normalize_embeddings=True,
+    )
+    return float(candidate_embedding @ reference_embedding)
