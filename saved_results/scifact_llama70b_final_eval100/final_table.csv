@@ -1,0 +1,8 @@
+dataset,method,code_mode,ndcg_at_10,mrr_at_10,answer_f1,answer_coverage,semantic_similarity,f1_retained_vs_top10,total_tokens,token_reduction_vs_top10,fallback_rate
+scifact,No Retrieval,no_retrieval_full,0.0,0.0,0.284872,0.487634,0.378135,108.8%,118.75,96.5%,0.0%
+scifact,Fixed Top-3,fixed_3_full,0.560244,0.541667,0.258731,0.798459,0.557575,98.8%,1130.66,66.9%,0.0%
+scifact,Fixed Top-5,fixed_5_full,0.587142,0.557167,0.263922,0.814751,0.570074,100.8%,1773.68,48.0%,0.0%
+scifact,Fixed Top-7,fixed_7_full,0.596729,0.560262,0.260914,0.801666,0.573219,99.6%,2445.84,28.3%,0.0%
+scifact,Fixed Top-10,fixed_10_full,0.602129,0.562762,0.261904,0.808004,0.56934,100.0%,3411.76,0.0%,0.0%
+scifact,Heuristic Rules,heuristic_rules_full,0.586836,0.556833,0.266407,0.80686,0.574866,101.7%,2233.7,34.5%,0.0%
+scifact,Safe Adaptive Context,answer_aware_fallback,0.560244,0.541667,0.265189,0.798939,0.568971,101.3%,933.48,72.6%,5.0%

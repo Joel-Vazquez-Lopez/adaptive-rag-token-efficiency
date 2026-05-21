@@ -1,33 +1,21 @@
 #!/usr/bin/env python3
 """
-Clean runner for the real Adaptive Context model.
+Main experiment runner.
 
-This file is small on purpose, but it calls the same tested model code in:
+This file is the one we run from the terminal.
+
+It does not contain the full model logic. The heavy work is inside:
 
     src/adaptive_retrieval/llm_budget.py
 
-So the GitHub project uses our real method:
+This file only does the experiment steps:
 
-1. Fixed top-k baselines.
-2. Basic adaptive budget.
-3. Safe Adaptive Context:
-   - first pass: compact evidence with evidence_ngram_neighbors
-   - safety check: inspect the generated answer
-   - fallback: expand to full top-10 if the answer looks weak
-
-How to read this file:
-
-- The first section imports the real model code.
-- METHODS_TO_RUN decides which experimental systems are evaluated.
-- FINAL_TABLE_ROWS decides which rows appear in the clean final report table.
-- build_final_table() converts the detailed experiment output into a small table.
-- main() loads the data, configures Ollama/Mistral, runs the experiment, and saves outputs.
-
-This file does not implement the model itself. It is the control script.
-The model implementation is in src/adaptive_retrieval/llm_budget.py.
+1. Load documents and queries.
+2. Choose which methods we want to compare.
+3. Configure the LLM.
+4. Run the experiment.
+5. Save the final tables.
 """
-
-from __future__ import annotations
 
 import argparse
 import csv
@@ -37,7 +25,7 @@ import sys
 from pathlib import Path
 
 
-# Let this script import the project package from src/.
+# Let Python find our project code inside src/.
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -45,10 +33,13 @@ from adaptive_retrieval.data import load_documents, load_queries
 from adaptive_retrieval.llm_budget import LLMConfig, run_llm_budget_experiment, write_llm_outputs
 
 
-# These are the methods we want in the final report table.
-# fixed_10 is the expensive baseline.
-# learned_budget is the basic adaptive model.
-# answer_aware_fallback is our stronger Safe Adaptive model.
+# These are the systems we actually run.
+#
+# We removed Basic Adaptive from the final experiment because it was mainly an
+# early prototype. The useful comparisons now are:
+# - fixed baselines
+# - heuristic baseline
+# - Safe Adaptive Context, which now expands progressively inside one model
 METHODS_TO_RUN = [
     "no_retrieval",
     "fixed_3",
@@ -56,13 +47,12 @@ METHODS_TO_RUN = [
     "fixed_7",
     "fixed_10",
     "heuristic_rules",
-    "learned_budget",
     "answer_aware_fallback",
 ]
 
 
-# The real experiment outputs several rows because it tests full context and compact evidence.
-# These are the exact rows we want to show as the clean comparison.
+# These are the rows we want in the clean final table.
+# The detailed CSV files still keep more information.
 FINAL_TABLE_ROWS = {
     "no_retrieval_full": "No Retrieval",
     "fixed_3_full": "Fixed Top-3",
@@ -70,7 +60,6 @@ FINAL_TABLE_ROWS = {
     "fixed_7_full": "Fixed Top-7",
     "fixed_10_full": "Fixed Top-10",
     "heuristic_rules_full": "Heuristic Rules",
-    "learned_budget_evidence_ngram_neighbors": "Basic Adaptive + Compact Evidence",
     "answer_aware_fallback": "Safe Adaptive Context",
 }
 
@@ -85,23 +74,27 @@ def percent(value):
     return f"{value * 100:.1f}%"
 
 
+def find_row(rows, mode):
+    # Find the result row for one method.
+    for row in rows:
+        if row["mode"] == mode:
+            return row
+    raise RuntimeError(f"Missing result row: {mode}")
+
+
 def build_final_table(answer_summary, dataset_name):
     # Make one small table for the report.
-    # The baseline for token/time reduction is fixed_10_full.
-    row_by_mode = {str(row["mode"]): row for row in answer_summary}
-    baseline = row_by_mode["fixed_10_full"]
+    baseline = find_row(answer_summary, "fixed_10_full")
 
     baseline_f1 = as_float(baseline, "answer_f1")
     baseline_tokens = as_float(baseline, "total_tokens")
-    baseline_time = as_float(baseline, "generation_time_ms")
 
     rows = []
     for mode, method_name in FINAL_TABLE_ROWS.items():
-        row = row_by_mode[mode]
+        row = find_row(answer_summary, mode)
 
         f1 = as_float(row, "answer_f1")
         tokens = as_float(row, "total_tokens")
-        time_ms = as_float(row, "generation_time_ms")
         fallback_rate = as_float(row, "fallback_rate")
 
         rows.append(
@@ -112,11 +105,11 @@ def build_final_table(answer_summary, dataset_name):
                 "ndcg_at_10": round(as_float(row, "ndcg_at_10"), 6),
                 "mrr_at_10": round(as_float(row, "mrr_at_10"), 6),
                 "answer_f1": round(f1, 6),
+                "answer_coverage": round(as_float(row, "answer_coverage"), 6),
+                "semantic_similarity": row.get("semantic_similarity", ""),
                 "f1_retained_vs_top10": percent(f1 / baseline_f1 if baseline_f1 else 0),
                 "total_tokens": round(tokens, 2),
                 "token_reduction_vs_top10": percent(1 - (tokens / baseline_tokens) if baseline_tokens else 0),
-                "generation_time_ms": round(time_ms, 2),
-                "time_reduction_vs_top10": percent(1 - (time_ms / baseline_time) if baseline_time else 0),
                 "fallback_rate": percent(fallback_rate),
             }
         )
@@ -189,6 +182,8 @@ def main():
     parser.add_argument("--api-url", default="http://localhost:11434/v1")
     parser.add_argument("--no-api-key", action="store_true", default=True)
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
+    parser.add_argument("--prompt-style", choices=["default", "concise", "anchor"], default="default")
+    parser.add_argument("--max-output-tokens", type=int, default=220)
     parser.add_argument("--request-timeout-seconds", type=int, default=300)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -199,6 +194,7 @@ def main():
 
     # Experiment size.
     parser.add_argument("--max-eval-queries", type=int, default=50)
+    parser.add_argument("--eval-start-index", type=int, default=0)
     parser.add_argument("--seed", type=int, default=0)
 
     args = parser.parse_args()
@@ -215,6 +211,8 @@ def main():
         api_key_env=args.api_key_env,
         require_api_key=not args.no_api_key,
         dry_run=args.dry_run,
+        prompt_style=args.prompt_style,
+        max_output_tokens=args.max_output_tokens,
         request_timeout_seconds=args.request_timeout_seconds,
         require_provider_tokens=args.require_provider_tokens,
     )
@@ -223,9 +221,10 @@ def main():
     answer_rows, answer_summary, retrieval_summary = run_llm_budget_experiment(
         documents=documents,
         queries=queries,
-        dev_ratio=0.4,
+        dev_ratio=1 / 3,
         config=config,
         max_eval_queries=args.max_eval_queries,
+        eval_start_index=args.eval_start_index,
         modes=METHODS_TO_RUN,
         compression_modes=["full", "evidence_ngram_neighbors"],
         oracle_strategy="minimum_sufficient",

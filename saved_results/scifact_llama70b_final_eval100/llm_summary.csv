@@ -1,0 +1,14 @@
+method_name,mode,docs_used,prompt_tokens,completion_tokens,total_tokens,token_reduction_vs_fixed_10,token_source,fallback_rate,first_pass_tokens,fallback_tokens,answer_f1,answer_coverage,semantic_similarity,ndcg_at_10,mrr_at_10
+No Retrieval,no_retrieval_full,0.0,96.59,22.16,118.75,0.965194,provider,0.0,0.0,0.0,0.284872,0.487634,0.378135,0.0,0.0
+No Retrieval,no_retrieval_evidence_ngram_neighbors,0.0,96.59,21.65,118.24,0.965343,provider,0.0,0.0,0.0,0.283211,0.486421,0.364928,0.0,0.0
+Fixed Small Context,fixed_3_full,3.0,1055.1,75.56,1130.66,0.668599,provider,0.0,0.0,0.0,0.258731,0.798459,0.557575,0.560244,0.541667
+Fixed Small + Compact Evidence,fixed_3_evidence_ngram_neighbors,3.0,702.06,73.98,776.04,0.77254,provider,0.0,0.0,0.0,0.261641,0.795672,0.572585,0.560244,0.541667
+Fixed Medium Context,fixed_5_full,5.0,1698.75,74.93,1773.68,0.480128,provider,0.0,0.0,0.0,0.263922,0.814751,0.570074,0.587142,0.557167
+Fixed Medium + Compact Evidence,fixed_5_evidence_ngram_neighbors,5.0,1104.29,73.63,1177.92,0.654747,provider,0.0,0.0,0.0,0.264971,0.802052,0.576922,0.587142,0.557167
+Fixed Large Context,fixed_7_full,7.0,2370.93,74.91,2445.84,0.283115,provider,0.0,0.0,0.0,0.260914,0.801666,0.573219,0.596729,0.560262
+Fixed Large + Compact Evidence,fixed_7_evidence_ngram_neighbors,7.0,1489.24,74.05,1563.29,0.541794,provider,0.0,0.0,0.0,0.262991,0.805064,0.57765,0.596729,0.560262
+Fixed Full Context,fixed_10_full,10.0,3335.79,75.97,3411.76,0.0,provider,0.0,0.0,0.0,0.261904,0.808004,0.56934,0.602129,0.562762
+Compressed Fixed Full Context,fixed_10_evidence_ngram_neighbors,10.0,2076.05,74.09,2150.14,0.369786,provider,0.0,0.0,0.0,0.257487,0.798055,0.570925,0.602129,0.562762
+Heuristic Rules,heuristic_rules_full,6.36,2159.87,73.83,2233.7,0.345294,provider,0.0,0.0,0.0,0.266407,0.80686,0.574866,0.586836,0.556833
+Heuristic Rules + Compact Evidence,heuristic_rules_evidence_ngram_neighbors,6.36,1378.48,74.54,1453.02,0.574114,provider,0.0,0.0,0.0,0.262447,0.805923,0.574786,0.586836,0.556833
+Safe Adaptive Context,answer_aware_fallback,3.14,853.23,80.25,933.48,0.726393,provider,0.05,775.42,158.06,0.265189,0.798939,0.568971,0.560244,0.541667

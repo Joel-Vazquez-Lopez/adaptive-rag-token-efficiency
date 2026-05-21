@@ -31,8 +31,14 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import math
+import os
 
 from adaptive_retrieval.text import tokenize
+
+
+_SEMANTIC_MODEL = None
+_SEMANTIC_MODEL_FAILED = False
 
 
 @dataclass
@@ -113,3 +119,62 @@ def answer_coverage(candidate: str, reference: str) -> float:
     if not reference_terms:
         return 0.0
     return len(candidate_terms & reference_terms) / len(reference_terms)
+
+
+
+def semantic_similarity(candidate: str, reference: str) -> float:
+    if not candidate.strip() or not reference.strip():
+        return 0.0
+
+    transformer_score = sentence_transformer_similarity(candidate, reference)
+    if transformer_score is not None:
+        return transformer_score
+
+    if os.environ.get("REQUIRE_SEMANTIC_MODEL") == "1":
+        raise RuntimeError("Semantic similarity model could not be loaded.")
+
+    return lexical_cosine_similarity(candidate, reference)
+
+
+def sentence_transformer_similarity(candidate: str, reference: str) -> float | None:
+    global _SEMANTIC_MODEL, _SEMANTIC_MODEL_FAILED
+
+    if _SEMANTIC_MODEL_FAILED:
+        return None
+
+    try:
+        if _SEMANTIC_MODEL is None:
+            from sentence_transformers import SentenceTransformer
+
+            model_name = os.environ.get(
+                "SEMANTIC_SIMILARITY_MODEL",
+                "sentence-transformers/all-MiniLM-L6-v2",
+            )
+            _SEMANTIC_MODEL = SentenceTransformer(model_name)
+
+        embeddings = _SEMANTIC_MODEL.encode(
+            [candidate, reference],
+            normalize_embeddings=True,
+        )
+        score = float(embeddings[0] @ embeddings[1])
+        return max(0.0, min(1.0, score))
+    except Exception:
+        _SEMANTIC_MODEL_FAILED = True
+        return None
+
+
+def lexical_cosine_similarity(candidate: str, reference: str) -> float:
+    candidate_counts = Counter(tokenize(candidate))
+    reference_counts = Counter(tokenize(reference))
+    if not candidate_counts or not reference_counts:
+        return 0.0
+
+    shared_terms = set(candidate_counts) & set(reference_counts)
+    dot_product = sum(candidate_counts[term] * reference_counts[term] for term in shared_terms)
+    candidate_norm = math.sqrt(sum(count * count for count in candidate_counts.values()))
+    reference_norm = math.sqrt(sum(count * count for count in reference_counts.values()))
+
+    if not candidate_norm or not reference_norm:
+        return 0.0
+
+    return dot_product / (candidate_norm * reference_norm)
