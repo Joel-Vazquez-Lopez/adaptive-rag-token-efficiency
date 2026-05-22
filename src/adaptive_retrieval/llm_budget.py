@@ -749,6 +749,129 @@ def short_answer_needs_fallback(query: Query, answer: str, selected_docs: list[D
     return False, ""
 
 
+def title_from_doc_id(doc_id: str) -> str:
+    """Return the readable title part used by converted paragraph datasets."""
+    return doc_id.split("::")[-1]
+
+
+def has_number(text: str) -> bool:
+    return bool(re.search(r"\d", text))
+
+
+def capitalized_terms(text: str) -> set[str]:
+    return set(re.findall(r"\b[A-Z][a-zA-Z0-9'’-]+\b", text))
+
+
+def sentence_pack_score(
+    query: Query,
+    doc: Document,
+    sentence: str,
+    doc_score: float,
+    top_score: float,
+) -> float:
+    """Score a sentence for short-answer QA packing."""
+    query_terms = content_word_set(query.text)
+    sentence_terms = content_word_set(sentence)
+    title_terms = content_word_set(title_from_doc_id(doc.doc_id))
+
+    overlap = len(query_terms & sentence_terms)
+    title_overlap = len(query_terms & title_terms)
+    entity_bonus = min(3, len(capitalized_terms(sentence))) * 0.15
+    number_bonus = 0.25 if has_number(sentence) else 0.0
+    relevance = doc_score / top_score if top_score > 0 else 0.0
+
+    return (2.0 * relevance) + (1.2 * overlap) + (0.8 * title_overlap) + entity_bonus + number_bonus
+
+
+def grouped_sentence_pack(units: list[tuple[str, str, str]]) -> list[Document]:
+    """Group selected sentence units back into compact pseudo-documents."""
+    by_doc: dict[str, list[str]] = {}
+    order: list[str] = []
+
+    for doc_id, title, sentence in units:
+        if doc_id not in by_doc:
+            by_doc[doc_id] = [title]
+            order.append(doc_id)
+        if sentence not in by_doc[doc_id]:
+            by_doc[doc_id].append(sentence)
+
+    return [
+        Document(doc_id=doc_id, text=". ".join(by_doc[doc_id]))
+        for doc_id in order
+    ]
+
+
+def token_budget_greedy_pack(
+    query: Query,
+    ranked_docs: list[tuple[Document, float]],
+    token_budget: int = 950,
+    pool_size: int = 10,
+    force_first_per_doc: bool = False,
+) -> list[Document]:
+    """Build a sentence-level context pack for short-answer / multi-hop QA.
+
+    This keeps broad top-10 retrieval coverage available and compresses inside
+    that pool. Sentences are selected by utility per token.
+    """
+    pool = ranked_docs[:pool_size]
+    top_score = pool[0][1] if pool and pool[0][1] > 0 else 1.0
+    candidates = []
+
+    for rank, (doc, doc_score) in enumerate(pool, start=1):
+        title = title_from_doc_id(doc.doc_id)
+        for index, sentence in enumerate(split_sentences(doc.text)):
+            score = sentence_pack_score(query, doc, sentence, doc_score, top_score)
+            token_len = max(1, estimate_tokens(sentence))
+            utility = score / (token_len ** 0.55)
+
+            if index == 0:
+                utility += 0.35
+
+            candidates.append({
+                "doc": doc,
+                "title": title,
+                "sentence": sentence,
+                "utility": utility,
+                "rank": rank,
+                "index": index,
+                "tokens": token_len,
+            })
+
+    selected = []
+    used = set()
+    total = 0
+
+    if force_first_per_doc:
+        for item in candidates:
+            key = (item["doc"].doc_id, item["index"])
+            if item["index"] == 0 and key not in used:
+                cost = estimate_tokens(item["title"]) + item["tokens"] + 4
+                if total + cost <= token_budget:
+                    selected.append(item)
+                    used.add(key)
+                    total += cost
+
+    for item in sorted(candidates, key=lambda item: item["utility"], reverse=True):
+        key = (item["doc"].doc_id, item["index"])
+        if key in used:
+            continue
+
+        cost = estimate_tokens(item["title"]) + item["tokens"] + 4
+        if total + cost > token_budget:
+            continue
+
+        selected.append(item)
+        used.add(key)
+        total += cost
+
+    selected.sort(key=lambda item: (item["rank"], item["index"]))
+    units = [
+        (item["doc"].doc_id, item["title"], item["sentence"])
+        for item in selected
+    ]
+    return grouped_sentence_pack(units)
+
+
 def answer_aware_fallback_run(
     query: Query,
     ranked_docs: list[tuple[Document, float]],
@@ -777,19 +900,12 @@ def answer_aware_fallback_run(
     # default = evidence-style answers, so use adaptive k and compact evidence.
     short_answer_task = config.prompt_style == "concise"
     if short_answer_task:
-        # Short-answer datasets still need adaptive context size.
-        # We avoid compression because exact entities can be lost, but we use
-        # the retrieval-based sequential budget so multi-hop questions are not
-        # forced into top-3.
-        first_budget = short_answer_pre_generation_budget(query, ranked_docs, sequential_budget)
-        stage_budgets = [first_budget]
-        for candidate in [5, 7, 8, 10]:
-            if candidate > first_budget and candidate not in stage_budgets:
-                stage_budgets.append(candidate)
-
+        # Short-answer / multi-hop tasks should keep broad retrieval coverage,
+        # but full top-10 is expensive. Pack high-utility sentences from top-10
+        # first, and only fall back to full top-10 if the answer is broken.
         stages = [
-            (f"top_{budget}_full", budget, "full")
-            for budget in stage_budgets
+            ("top_10_token_budget_pack", 10, "token_budget_greedy_pack"),
+            ("top_10_full", 10, "full"),
         ]
     else:
         first_budget = min(max(sequential_budget, 3), 10)
@@ -830,6 +946,8 @@ def answer_aware_fallback_run(
         full_docs = [doc for doc, _score in ranked_docs[:budget]]
         if compression_mode == "full":
             selected_docs = full_docs
+        elif compression_mode == "token_budget_greedy_pack":
+            selected_docs = token_budget_greedy_pack(query, ranked_docs, token_budget=950, pool_size=10)
         else:
             selected_docs = compress_documents(query, full_docs, compression_mode)
 
