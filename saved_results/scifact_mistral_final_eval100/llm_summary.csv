@@ -1,0 +1,14 @@
+method_name,mode,docs_used,prompt_tokens,completion_tokens,total_tokens,token_reduction_vs_fixed_10,token_source,generation_time_ms,fallback_rate,first_pass_tokens,fallback_tokens,answer_f1,answer_coverage,semantic_similarity,ndcg_at_10,mrr_at_10
+No Retrieval,no_retrieval_full,0.0,86.8,62.62,149.42,0.961273,provider,6812.84,0.0,0.0,0.0,0.296908,0.66854,0.458443,0.0,0.0
+No Retrieval,no_retrieval_evidence_ngram_neighbors,0.0,86.8,62.7,149.5,0.961252,provider,6590.76,0.0,0.0,0.0,0.295898,0.664628,0.455836,0.0,0.0
+Fixed Small Context,fixed_3_full,3.0,1250.79,118.88,1369.67,0.645008,provider,24048.73,0.0,0.0,0.0,0.222404,0.780602,0.480042,0.560244,0.541667
+Fixed Small + Compact Evidence,fixed_3_evidence_ngram_neighbors,3.0,851.92,124.62,976.54,0.7469,provider,20175.18,0.0,0.0,0.0,0.20509,0.758299,0.466856,0.560244,0.541667
+Fixed Medium Context,fixed_5_full,5.0,2033.26,122.46,2155.72,0.441279,provider,32149.75,0.0,0.0,0.0,0.215452,0.781296,0.477731,0.587142,0.557167
+Fixed Medium + Compact Evidence,fixed_5_evidence_ngram_neighbors,5.0,1360.37,127.52,1487.89,0.614367,provider,25211.81,0.0,0.0,0.0,0.20194,0.748607,0.459675,0.587142,0.557167
+Fixed Large Context,fixed_7_full,7.0,2823.96,122.39,2946.35,0.236363,provider,41242.67,0.0,0.0,0.0,0.20976,0.738329,0.454502,0.596729,0.560262
+Fixed Large + Compact Evidence,fixed_7_evidence_ngram_neighbors,7.0,1850.22,127.43,1977.65,0.487431,provider,31406.54,0.0,0.0,0.0,0.209738,0.757377,0.466497,0.596729,0.560262
+Fixed Full Context,fixed_10_full,10.0,3706.12,152.19,3858.31,0.0,provider,54339.52,0.0,0.0,0.0,0.155448,0.617404,0.39176,0.602129,0.562762
+Compressed Fixed Full Context,fixed_10_evidence_ngram_neighbors,10.0,2585.18,134.08,2719.26,0.29522,provider,40072.4,0.0,0.0,0.0,0.195662,0.749268,0.44912,0.602129,0.562762
+Heuristic Rules,heuristic_rules_full,6.36,2578.26,122.52,2700.78,0.30001,provider,38243.21,0.0,0.0,0.0,0.213437,0.751021,0.459969,0.586836,0.556833
+Heuristic Rules + Compact Evidence,heuristic_rules_evidence_ngram_neighbors,6.36,1708.28,127.15,1835.43,0.524292,provider,29309.21,0.0,0.0,0.0,0.20657,0.756606,0.464751,0.586836,0.556833
+Safe Adaptive Context,answer_aware_fallback,3.07,977.57,136.15,1113.72,0.711345,provider,15116.05,0.07,977.99,135.73,0.208471,0.756672,0.466747,0.560244,0.541667
