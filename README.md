@@ -14,6 +14,7 @@ The important method is:
 - Simon Backhaus Brudzewski
 - Karlis Martins Auce
 - Joel Vazquez
+- Sheraz Ahmad 
 
 ## What The Pipeline Does
 
