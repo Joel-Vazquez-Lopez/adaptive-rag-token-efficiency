@@ -20,6 +20,31 @@ This run uses the same max output token setting as the hosted Llama SciFact eval
 - Seed: 0
 - Token source: provider-reported usage
 
+## Main result
+
+Safe Adaptive Context substantially reduces token usage while retaining stronger answer quality than Fixed Top-10.
+
+From `final_table.csv`:
+
+- Fixed Top-10 total tokens: 3781.14
+- Safe Adaptive total tokens: 985.01
+- Token reduction: 73.9%
+- Fixed Top-10 Answer F1: 0.203530
+- Safe Adaptive Answer F1: 0.252913
+- Fixed Top-10 semantic similarity: 0.363887
+- Safe Adaptive semantic similarity: 0.426009
+- Safe Adaptive fallback rate: 5.0%
+
+Compared with the heuristic baseline, Safe Adaptive uses substantially fewer tokens while preserving most answer quality:
+
+- Heuristic total tokens: 2651.75
+- Safe Adaptive total tokens: 985.01
+- Safe Adaptive uses about 62.9% fewer tokens than Heuristic.
+- Heuristic Answer F1: 0.264540
+- Safe Adaptive Answer F1: 0.252913
+- Heuristic semantic similarity: 0.437337
+- Safe Adaptive semantic similarity: 0.426009
+
 ## Files
 
 - `final_table.csv`: final report table in CSV format
