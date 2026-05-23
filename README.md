@@ -286,7 +286,7 @@ brew install ollama
 Download/test Mistral:
 
 ```bash
-ollama run mistral "What is the capital of France?"
+ollama run mistral "What is the capital of Spain?"
 ```
 
 Install Python requirements:
