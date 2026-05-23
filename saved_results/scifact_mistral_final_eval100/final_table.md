@@ -1,9 +1,9 @@
 | dataset | method | code_mode | ndcg_at_10 | mrr_at_10 | answer_f1 | answer_coverage | semantic_similarity | f1_retained_vs_top10 | semantic_similarity_retained_vs_top10 | total_tokens | token_reduction_vs_top10 | fallback_rate |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| scifact | No Retrieval | no_retrieval_full | 0.0 | 0.0 | 0.296908 | 0.66854 | 0.458443 | 191.0% | 117.0% | 149.42 | 96.1% | 0.0% |
-| scifact | Fixed Top-3 | fixed_3_full | 0.560244 | 0.541667 | 0.222404 | 0.780602 | 0.480042 | 143.1% | 122.5% | 1369.67 | 64.5% | 0.0% |
-| scifact | Fixed Top-5 | fixed_5_full | 0.587142 | 0.557167 | 0.215452 | 0.781296 | 0.477731 | 138.6% | 121.9% | 2155.72 | 44.1% | 0.0% |
-| scifact | Fixed Top-7 | fixed_7_full | 0.596729 | 0.560262 | 0.20976 | 0.738329 | 0.454502 | 134.9% | 116.0% | 2946.35 | 23.6% | 0.0% |
-| scifact | Fixed Top-10 | fixed_10_full | 0.602129 | 0.562762 | 0.155448 | 0.617404 | 0.39176 | 100.0% | 100.0% | 3858.31 | 0.0% | 0.0% |
-| scifact | Heuristic Rules | heuristic_rules_full | 0.586836 | 0.556833 | 0.213437 | 0.751021 | 0.459969 | 137.3% | 117.4% | 2700.78 | 30.0% | 0.0% |
-| scifact | Safe Adaptive Context | answer_aware_fallback | 0.560244 | 0.541667 | 0.208471 | 0.756672 | 0.466747 | 134.1% | 119.1% | 1113.72 | 71.1% | 7.0% |
+| scifact | No Retrieval | no_retrieval_full | 0.0 | 0.0 | 0.304012 | 0.638218 | 0.450881 | 149.4% | 123.9% | 141.78 | 96.3% | 0.0% |
+| scifact | Fixed Top-3 | fixed_3_full | 0.560244 | 0.541667 | 0.267859 | 0.659386 | 0.439481 | 131.6% | 120.8% | 1323.35 | 65.0% | 0.0% |
+| scifact | Fixed Top-5 | fixed_5_full | 0.587142 | 0.557167 | 0.265123 | 0.675999 | 0.442579 | 130.3% | 121.6% | 2105.76 | 44.3% | 0.0% |
+| scifact | Fixed Top-7 | fixed_7_full | 0.596729 | 0.560262 | 0.26181 | 0.673588 | 0.439126 | 128.6% | 120.7% | 2897.9 | 23.4% | 0.0% |
+| scifact | Fixed Top-10 | fixed_10_full | 0.602129 | 0.562762 | 0.20353 | 0.544584 | 0.363887 | 100.0% | 100.0% | 3781.14 | 0.0% | 0.0% |
+| scifact | Heuristic Rules | heuristic_rules_full | 0.586836 | 0.556833 | 0.26454 | 0.668578 | 0.437337 | 130.0% | 120.2% | 2651.75 | 29.9% | 0.0% |
+| scifact | Safe Adaptive Context | answer_aware_fallback | 0.560244 | 0.541667 | 0.252913 | 0.646978 | 0.426009 | 124.3% | 117.1% | 985.01 | 73.9% | 5.0% |
