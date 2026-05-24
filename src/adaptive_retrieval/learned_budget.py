@@ -28,13 +28,15 @@ import math
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from sentence_transformers import CrossEncoder
+
 
 from adaptive_retrieval.budget_experiment import _record_metrics
 from adaptive_retrieval.data import Document, Query
 from adaptive_retrieval.metrics import RunMetrics
 from adaptive_retrieval.retriever import retrieve
 from adaptive_retrieval.text import build_idf, tfidf_vector, tokenize
-
+from collections import defaultdict
 
 BUDGETS = [3, 5, 8, 10]
 SMALL_BUDGETS = [3, 5]
@@ -51,6 +53,13 @@ THRESHOLD_STRATEGIES = {"heuristic", "calibrated"}
 # - uses retrieval/query features
 # - predicts whether the query needs a small or large context budget
 # The newer LLM script also uses these predictions as part of the stronger models.
+cross_encoder = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+cross_encoder_cahce = {}
+
+all_pairs = []
+pair_metadata = []  # to reconstruct results
+query_order = []
 
 @dataclass(frozen=True)
 class TrainingExample:
@@ -75,6 +84,7 @@ class CentroidModel:
     large_threshold: float
     very_large_threshold: float
     low_entropy_small_default: bool
+
 
 
 def split_queries(queries: list[Query], dev_ratio: float) -> tuple[list[Query], list[Query]]:
@@ -197,25 +207,59 @@ def oracle_objective(row: RunMetrics, baseline_tokens: float) -> float:
     )
 
 
+
+
 def build_examples(
     documents: list[Document],
     queries: list[Query],
     oracle_strategy: str = "minimum_sufficient",
     sufficiency_ratio: float = 0.95,
+    cross_encoder=cross_encoder,
+    doc_vectors=None,
+    idf=None,
 ) -> tuple[list[TrainingExample], dict[str, list[tuple[Document, float]]]]:
-    # Build the training/evaluation examples:
-    # 1. index documents with TF-IDF
-    # 2. retrieve top-10 for each query
-    # 3. compute the oracle budget label
-    # 4. extract cheap features
-    idf = build_idf(documents)
-    doc_vectors = {doc.doc_id: tfidf_vector(doc.text, idf) for doc in documents}
-    ranked_by_query: dict[str, list[tuple[Document, float]]] = {}
+
+    ranked_by_query = {}
     examples = []
 
+    all_pairs = []
+    meta = []
+
+    # ---------------------------
+    # STEP 1: build candidate pool
+    # ---------------------------
+    count = 0
     for query in queries:
-        ranked = retrieve(query, documents, doc_vectors, idf, None, 10)
-        ranked_by_query[query.query_id] = ranked
+        count += 1
+        if count % 20 == 0:
+            print("query", count)
+        candidates = retrieve(
+            query,
+            documents,
+            doc_vectors,
+            idf,
+            doc_weights=None,
+            top_k=10,
+            candidate_k=15
+        )
+
+        for doc, _ in candidates:
+            all_pairs.append((query.text, doc.text))
+            meta.append((query.query_id, doc))
+
+    scores = cross_encoder.predict(all_pairs, batch_size=64, show_progress_bar=True)
+
+    ranked_by_query = defaultdict(list)
+
+    for (query_id, doc), score in zip(meta, scores):
+        ranked_by_query[query_id].append((doc, float(score)))
+    
+    for qid in ranked_by_query:
+        ranked_by_query[qid].sort(key=lambda x: x[1], reverse=True)
+
+    for query in queries:
+        ranked = ranked_by_query[query.query_id]
+
         examples.append(
             TrainingExample(
                 query_id=query.query_id,
@@ -228,6 +272,7 @@ def build_examples(
                 features=extract_features(query, ranked),
             )
         )
+
 
     return examples, ranked_by_query
 

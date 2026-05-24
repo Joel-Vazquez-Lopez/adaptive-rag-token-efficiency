@@ -36,14 +36,23 @@ import random
 import sys
 from pathlib import Path
 
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+
+print("TOP OF FILE EXECUTED")
 # Let this script import the project package from src/.
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+documents_path = ROOT / "data" / "scifact" / "documents.jsonl"
+queries_path = ROOT / "data" / "scifact" / "queries_150_seed0.jsonl"
+
 from adaptive_retrieval.data import load_documents, load_queries
 from adaptive_retrieval.llm_budget import LLMConfig, run_llm_budget_experiment, write_llm_outputs
-
+print("TOP OF FILE EXECUTED")
+print("FILE LOADED:", __file__)
 
 # These are the methods we want in the final report table.
 # fixed_10 is the expensive baseline.
@@ -174,11 +183,13 @@ def set_seed(seed):
 
 
 def main():
+
+    print('Hello')
     parser = argparse.ArgumentParser(description="Run the real Adaptive RAG experiment.")
 
     # Dataset paths.
-    parser.add_argument("--documents", type=Path, default=Path("data/scifact/documents.jsonl"))
-    parser.add_argument("--queries", type=Path, default=Path("data/scifact/queries_150_seed0.jsonl"))
+    parser.add_argument("--documents", type=Path, default=documents_path)
+    parser.add_argument("--queries", type=Path, default=queries_path)
     parser.add_argument("--dataset-name", default="SciFact")
 
     # Output folder.
@@ -189,7 +200,7 @@ def main():
     parser.add_argument("--api-url", default="http://localhost:11434/v1")
     parser.add_argument("--no-api-key", action="store_true", default=True)
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY")
-    parser.add_argument("--request-timeout-seconds", type=int, default=300)
+    parser.add_argument("--request-timeout-seconds", type=int, default=30000)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "--require-provider-tokens",
@@ -207,7 +218,7 @@ def main():
     print("Loading data...")
     documents = load_documents(args.documents)
     queries = load_queries(args.queries)
-
+    print("START QUERY")
     print("Configuring model...")
     config = LLMConfig(
         model=args.model,

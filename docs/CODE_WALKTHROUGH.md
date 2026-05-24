@@ -178,7 +178,7 @@ Examples of features:
 - score entropy
 - whether evidence looks concentrated or spread across documents
 
-The model is intentionally simple:
+The model is intentionally simple: #### KARL: if we add tf/idf cross-encoder its no longer A NON-NEURAL, NON-DL model
 
 - no neural network
 - no deep learning

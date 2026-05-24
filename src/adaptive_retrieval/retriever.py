@@ -18,11 +18,14 @@ from __future__ import annotations
 
 from adaptive_retrieval.data import Document, Query
 from adaptive_retrieval.text import cosine_similarity, tfidf_vector, tokenize
-
+from sentence_transformers import CrossEncoder
+import hashlib
+from collections import defaultdict
 
 # This file contains the simple retrieval logic.
 # It ranks documents using TF-IDF cosine similarity.
 # Later parts of the project decide how much of the retrieved context to send to the LLM.
+
 
 def _score_gap(ranked_docs: list[tuple[Document, float]], first: int, second: int) -> float:
     # Helper for older adaptive rules.
@@ -34,32 +37,98 @@ def _score_gap(ranked_docs: list[tuple[Document, float]], first: int, second: in
         return 0.0
     return (ranked_docs[first][1] - ranked_docs[second][1]) / top_score
 
+def make_key(query_text, doc_id):
+    return hashlib.md5(
+        (query_text + "||" + doc_id).encode("utf-8")
+    ).hexdigest()
+
 
 def retrieve(
     query: Query,
     documents: list[Document],
-    doc_vectors: dict[str, dict[str, float]],
-    idf: dict[str, float],
-    doc_weights: dict[str, float] | None,
+    doc_vectors,
+    idf,
+    doc_weights,
     top_k: int,
-) -> list[tuple[Document, float]]:
-    # Convert the query into the same TF-IDF space as the documents.
+    candidate_k: int = 15,
+):
+    assert idf is not None, "idf is None — build_idf() not called or not passed correctly"
     query_vector = tfidf_vector(query.text, idf)
 
-    # Score every document against the query.
     scored = []
     for doc in documents:
         base_score = cosine_similarity(query_vector, doc_vectors[doc.doc_id])
+        weighted = base_score * (doc_weights or {}).get(doc.doc_id, 1.0)
+        scored.append((doc, weighted))
 
-        # doc_weights is used by some older experiments.
-        # Most current runs pass None, so each document weight is 1.0.
-        weighted_score = base_score * (doc_weights or {}).get(doc.doc_id, 1.0)
-        scored.append((doc, weighted_score))
+    candidates = sorted(scored, key=lambda x: x[1], reverse=True)[:candidate_k]
 
-    # Return the highest-scoring documents first.
-    return sorted(scored, key=lambda item: item[1], reverse=True)[:top_k]
+    return candidates[:top_k]
 
 
+
+def build_all_candidates(queries, documents, doc_vectors, idf, doc_weights, candidate_k):
+    all_pairs = []
+    meta = []
+
+    for query in queries:
+        query_vector = tfidf_vector(query.text, idf)
+
+        scored = []
+        for doc in documents:
+            base = cosine_similarity(query_vector, doc_vectors[doc.doc_id])
+            weighted = base * (doc_weights or {}).get(doc.doc_id, 1.0)
+            scored.append((doc, weighted))
+
+        candidates = sorted(scored, key=lambda x: x[1], reverse=True)[:candidate_k]
+
+        for doc, _ in candidates:
+            all_pairs.append((query.text, doc.text))
+            meta.append((query.query_id, doc))
+
+    return all_pairs, meta
+
+
+
+def group_by_query(meta, scores):
+    grouped = defaultdict(list)
+
+    for (query_id, doc), score in zip(meta, scores):
+        grouped[query_id].append((doc, float(score)))
+
+    # sort each query’s results once
+    for qid in grouped:
+        grouped[qid].sort(key=lambda x: x[1], reverse=True)
+
+    return grouped
+
+def retrieve_all_with_cross_encoder(
+    queries,
+    documents,
+    idf,
+    doc_vectors,
+    doc_weights,
+    candidate_k,
+    cross_encoder
+):
+    # 1. build all TF-IDF candidates
+    all_pairs, meta = build_all_candidates(
+        queries,
+        documents,
+        doc_vectors,
+        idf,
+        doc_weights,
+        candidate_k
+    )
+
+    # 2. single CE call
+    scores = run_cross_encoder(all_pairs, cross_encoder)
+
+    # 3. group results
+    ranked_by_query = group_by_query(meta, scores)
+
+    return ranked_by_query
+    
 def choose_adaptive_subset(
     ranked_docs: list[tuple[Document, float]],
     min_docs: int,

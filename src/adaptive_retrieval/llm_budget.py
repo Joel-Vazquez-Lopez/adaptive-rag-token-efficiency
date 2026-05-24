@@ -57,7 +57,7 @@ from adaptive_retrieval.learned_budget import (
     train_centroid_model,
 )
 from adaptive_retrieval.metrics import answer_coverage, ndcg_at_k, token_f1
-from adaptive_retrieval.text import estimate_tokens, tokenize
+from adaptive_retrieval.text import estimate_tokens, tokenize, build_idf, build_index, tfidf_vector, build_doc_vectors
 
 PROMPT_STYLES = {"default", "concise", "anchor"}
 
@@ -138,21 +138,21 @@ RISK_STOPWORDS = {
 @dataclass(frozen=True)
 class LLMConfig:
     # Model name used by the remote LLM API.
-    model: str = "gpt-4o-mini"
+    model: str = "mistral"
     # Temperature is kept at zero so repeated runs are easier to compare.
     temperature: float = 0.0
     # Upper bound on generated answer length. This keeps completion-token cost controlled.
     max_output_tokens: int = 220
     # Local models can be slow, especially with long fixed_10 prompts.
-    request_timeout_seconds: int = 300
-    # API URL for OpenAI-compatible chat-completions providers.
-    api_url: str = "https://api.openai.com/v1/chat/completions"
+    request_timeout_seconds: int = 30000
+     # 👇 Ollama OpenAI-compatible endpoint
+    api_url: str = "http://localhost:11434/v1/chat/completions"
     # Environment variable that stores the API key. Ollama can leave this unset.
-    api_key_env: str = "OPENAI_API_KEY"
-    # Local providers such as Ollama do not require an Authorization header.
-    require_api_key: bool = True
-    # Dry-run mode avoids network calls and uses a simple extractive answer instead.
-    dry_run: bool = True
+    # 👇 Ollama does NOT use API keys
+    api_key_env: str = ""
+    require_api_key: bool = False
+    # ⚠️ IMPORTANT: turn this OFF or it will skip real calls
+    dry_run: bool = False
     # Compression controls how much of each selected document is shown to the answer model.
     compression_mode: str = "full"
     # Prompt style controls the answer format without changing retrieval/context selection.
@@ -955,18 +955,26 @@ def run_llm_budget_experiment(
 ) -> tuple[list[LLMRunRow], list[dict[str, object]], list[dict[str, object]]]:
     # Reuse the learned-budget training/evaluation path so the LLM experiment
     # tests exactly the same budget controller as run_learned_budget.py.
+
+    idf = build_idf(documents)
+    doc_vectors = build_doc_vectors(documents, idf)
+
     dev_queries, eval_queries = split_queries(queries, dev_ratio)
     if max_eval_queries is not None:
         eval_queries = eval_queries[:max_eval_queries]
     dev_examples, _dev_ranked = build_examples(
         documents,
         dev_queries,
+        idf=idf,
+        doc_vectors=doc_vectors,
         oracle_strategy=oracle_strategy,
         sufficiency_ratio=sufficiency_ratio,
     )
     eval_examples, eval_ranked = build_examples(
         documents,
         eval_queries,
+        idf=idf,
+        doc_vectors=doc_vectors,
         oracle_strategy=oracle_strategy,
         sufficiency_ratio=sufficiency_ratio,
     )

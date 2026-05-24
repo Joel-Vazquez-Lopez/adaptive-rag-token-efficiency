@@ -54,6 +54,20 @@ def build_idf(documents: Iterable[Document]) -> dict[str, float]:
         for term, count in document_frequency.items()
     }
 
+def build_index(documents, idf):
+    doc_vectors = {
+        doc.doc_id: tfidf_vector(doc.text, idf)
+        for doc in documents
+    }
+    return doc_vectors
+
+def build_doc_vectors(documents, idf):
+    # Precompute TF-IDF vectors for all documents.
+    # This makes retrieval faster because we don't have to recompute them for every query.
+    return {
+        doc.doc_id: tfidf_vector(doc.text, idf)
+        for doc in documents
+    }
 
 def tfidf_vector(text: str, idf: dict[str, float]) -> dict[str, float]:
     # Convert text into a sparse TF-IDF vector:
