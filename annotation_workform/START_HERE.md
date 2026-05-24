@@ -1,7 +1,6 @@
 # RAG Annotation — Getting Started
 
 You have been asked to rate AI-generated answers for quality.
-This takes approximately **30–45 minutes** for all 45 items.
 
 ---
 
