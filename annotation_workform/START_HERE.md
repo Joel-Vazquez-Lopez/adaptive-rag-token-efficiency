@@ -54,7 +54,7 @@ Pick a **Rating** from the dropdown. Adding a **Note** is optional but helpful w
 ## Step 3 — Export when done
 
 Click **Export CSV** (top-right corner) to download `rag_annotations.csv`.
-Send that file to the project lead.
+Send that file to the person who is doing the Annotation results reporting.
 
 ---
 
