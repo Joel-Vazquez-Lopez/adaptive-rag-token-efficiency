@@ -1,4 +1,0 @@
-dataset,queries_path,answers_path,sampled_queries,annotation_rows
-scifact,data/scifact/queries_150_seed0_llm_gold_v2.jsonl,saved_results/scifact_llama70b_final_eval100/llm_answers_by_query.csv,13,39
-hotpotqa,data/hotpotqa_classmate/queries_150.jsonl,saved_results/hotpotqa_llama70b_final_eval100/llm_answers_by_query.csv,13,39
-bioasq,data/bioasq_candidate/queries.jsonl,saved_results/bioasq_llama70b_final_eval100/llm_answers_by_query.csv,8,24

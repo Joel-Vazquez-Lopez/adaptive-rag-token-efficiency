@@ -96,15 +96,21 @@ button:hover,
 .layout {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(520px, 1fr);
-  min-height: calc(100vh - 76px);
+  height: calc(100vh - 76px);
+  min-height: 0;
 }
 
 .sidebar,
 .stats {
   background: var(--surface);
   border-right: 1px solid var(--border);
-  min-height: calc(100vh - 76px);
-  overflow: auto;
+  min-height: 0;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .stats {
@@ -119,6 +125,30 @@ button:hover,
   padding: 12px;
   border-bottom: 1px solid var(--border);
   background: #fbfcfd;
+}
+
+.dataset-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.dataset-tab {
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.dataset-tab.active {
+  border-color: var(--accent);
+  background: #e8f3f7;
+  color: var(--accent-strong);
+  font-weight: 750;
 }
 
 label {
@@ -146,6 +176,10 @@ textarea {
 
 .sample-list {
   display: grid;
+  align-content: start;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .sample-row {
@@ -153,11 +187,12 @@ textarea {
   grid-template-columns: 1fr auto;
   gap: 6px;
   width: 100%;
+  min-height: 58px;
   text-align: left;
   border: 0;
   border-bottom: 1px solid var(--border);
   border-radius: 0;
-  padding: 10px 12px;
+  padding: 11px 12px;
   background: var(--surface);
 }
 
@@ -170,11 +205,16 @@ textarea {
 .sample-row strong {
   display: block;
   font-size: 13px;
+  line-height: 1.25;
+  margin-bottom: 3px;
+  overflow-wrap: anywhere;
 }
 
 .sample-row span {
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .status-dot {
@@ -536,7 +576,6 @@ td {
 
 @media (max-width: 760px) {
   .app-header,
-  .layout,
   .annotation-grid,
   .evidence-grid,
   .adjudication-grid,
@@ -546,10 +585,30 @@ td {
     display: block;
   }
 
-  .sidebar,
+  .layout {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 76px);
+  }
+
+  .sidebar {
+    height: 46vh;
+    min-height: auto;
+  }
+
+  .sample-list {
+    max-height: none;
+    overflow: auto;
+  }
+
   .stats,
   .workspace {
     min-height: auto;
+  }
+
+  .workspace {
+    padding: 12px;
   }
 
   .annotation-form,

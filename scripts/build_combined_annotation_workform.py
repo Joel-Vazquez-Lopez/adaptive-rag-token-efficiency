@@ -1,66 +1,155 @@
 #!/usr/bin/env python3
+"""
+Build the human annotation workform.
+
+Samples 15 answers per dataset (8 best-scored + 7 worst-scored) from the
+Main Adaptive Method (answer_aware_fallback) only, pooled across all available
+models (Llama-70B, Mistral), from three datasets: SciFact, HotpotQA, BioASQ.
+
+Total: 45 items.
+
+Outputs (written to --out-dir, default annotation_workform/final)
+------
+  annotation_items.csv            all 45 items
+  annotation_items_scifact.csv    SciFact subset (15 items)
+  annotation_items_hotpotqa.csv   HotpotQA subset (15 items)
+  annotation_items_bioasq.csv     BioASQ subset (15 items)
+  source_files.csv                input file paths used
+  annotation_backup.xlsx          Excel backup with per-dataset sheets
+  README.md
+
+Also writes:
+  annotation_workform/data.js     browser form data
+"""
 
 import argparse
 import json
-import random
 from pathlib import Path
 
 import pandas as pd
+from openpyxl import Workbook
+from openpyxl.worksheet.datavalidation import DataValidation
 
 
-METHODS = [
-    "fixed_10_full",
-    "heuristic_rules_full",
-    "answer_aware_fallback",
-]
+# --------------------------------------------------------------------------- #
+# Configuration
+# --------------------------------------------------------------------------- #
 
-METHOD_DISPLAY = {
-    "fixed_10_full": "Fixed Top-10",
-    "heuristic_rules_full": "Heuristic Rules",
-    "answer_aware_fallback": "Main Adaptive Method",
+METHOD = "answer_aware_fallback"
+METHOD_DISPLAY = "Main Adaptive Method"
+
+MODEL_CONFIGS = {
+    "llama70b": {"display": "Llama-70B"},
+    "mistral": {"display": "Mistral"},
 }
 
+DATASET_DISPLAY = {
+    "scifact": "SciFact",
+    "hotpotqa": "HotpotQA",
+    "bioasq": "BioASQ",
+}
+
+# 15 items per dataset: 8 best-scored + 7 worst-scored, pooled across models.
 DATASET_CONFIGS = {
     "scifact": {
-        "n_queries": 13,
+        "best_items": 8,
+        "worst_items": 7,
+        "documents_candidates": [
+            "data/scifact/documents.jsonl",
+        ],
         "queries_candidates": [
             "data/scifact/queries_150_seed0_llm_gold_v2.jsonl",
             "data/scifact/queries_150_seed0_llm_gold.jsonl",
             "data/scifact/queries_150_seed0.jsonl",
             "data/scifact/queries_all.jsonl",
         ],
-        "answers_candidates": [
-            "saved_results/scifact_llama70b_final_eval100/llm_answers_by_query.csv",
-            "outputs/scifact_llama70b_merged_eval100/llm_answers_by_query.csv",
-        ],
+        "answers_by_model": {
+            "llama70b": [
+                "saved_results/scifact_llama70b_final_eval100/llm_answers_by_query.csv",
+                "outputs/scifact_llama70b_merged_eval100/llm_answers_by_query.csv",
+            ],
+            "mistral": [
+                "saved_results/scifact_mistral_final_eval100/llm_answers_by_query.csv",
+            ],
+        },
     },
     "hotpotqa": {
-        "n_queries": 13,
+        "best_items": 8,
+        "worst_items": 7,
+        "documents_candidates": [
+            "data/hotpotqa/documents.jsonl",
+            "data/hotpotqa_classmate/documents.jsonl",
+            "data/hotpotqa_final/documents.jsonl",
+        ],
         "queries_candidates": [
+            "data/hotpotqa/queries.jsonl",
             "data/hotpotqa_classmate/queries_150.jsonl",
             "data/hotpotqa_final/queries_150.jsonl",
-            "data/hotpotqa/queries.jsonl",
         ],
-        "answers_candidates": [
-            "saved_results/hotpotqa_llama70b_final_eval100/llm_answers_by_query.csv",
-            "saved_results/hotpotqa_llama70b_final_eval/llm_answers_by_query.csv",
-            "saved_results/hotpotqa_llama70b_final/llm_answers_by_query.csv",
-        ],
+        "answers_by_model": {
+            "llama70b": [
+                "saved_results/hotpotqa_llama70b_final_eval100/llm_answers_by_query.csv",
+                "saved_results/hotpotqa_llama70b_final_eval/llm_answers_by_query.csv",
+                "saved_results/hotpotqa_llama70b_final/llm_answers_by_query.csv",
+            ],
+            "mistral": [
+                "saved_results/hotpotqa_mistral_final_eval100/llm_answers_by_query.csv",
+            ],
+        },
     },
     "bioasq": {
-        "n_queries": 8,
+        "best_items": 8,
+        "worst_items": 7,
+        "documents_candidates": [
+            "data/bioasq_candidate/documents.jsonl",
+        ],
         "queries_candidates": [
             "data/bioasq_candidate/queries.jsonl",
         ],
-        "answers_candidates": [
-            "saved_results/bioasq_llama70b_final_eval100/llm_answers_by_query.csv",
-            "outputs/bioasq_llama70b_80_eval100_merged/llm_answers_by_query.csv",
-        ],
+        "answers_by_model": {
+            "llama70b": [
+                "saved_results/bioasq_llama70b_final_eval100/llm_answers_by_query.csv",
+                "outputs/bioasq_llama70b_80_eval100_merged/llm_answers_by_query.csv",
+            ],
+            "mistral": [
+                "saved_results/bioasq_mistral_final_eval100/llm_answers_by_query.csv",
+            ],
+        },
     },
 }
 
+RATING_LABELS = [
+    "CORRECT",
+    "PARTIALLY_CORRECT",
+    "INCORRECT",
+    "NOT_ENOUGH_INFO",
+]
 
-def find_existing_path(candidates, label):
+# Columns to include in the Excel backup (evidence is truncated to fit cells).
+EXCEL_COLUMNS = [
+    "annotation_id",
+    "dataset_name",
+    "model_name",
+    "system",
+    "selection_reason",
+    "query_text",
+    "reference_answer",
+    "model_answer",
+    "evidence",
+    "answer_f1",
+    "semantic_similarity",
+    "rating",
+    "notes",
+]
+
+MAX_EVIDENCE_CHARS = 3000
+
+
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+
+def find_existing_path(candidates: list[str], label: str) -> Path:
     for candidate in candidates:
         path = Path(candidate)
         if path.exists():
@@ -71,11 +160,20 @@ def find_existing_path(candidates, label):
 
 
 def read_queries(path: Path) -> dict[str, dict]:
-    rows = {}
+    rows: dict[str, dict] = {}
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             row = json.loads(line)
             rows[str(row["query_id"])] = row
+    return rows
+
+
+def read_documents(path: Path) -> dict[str, str]:
+    rows: dict[str, str] = {}
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            row = json.loads(line)
+            rows[str(row["doc_id"])] = clean_text(row.get("text", ""))
     return rows
 
 
@@ -87,286 +185,484 @@ def clean_text(value) -> str:
     return str(value).replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
-def parse_selected_doc_ids(value):
+def parse_selected_doc_ids(value) -> list[str]:
     text = clean_text(value)
     if not text:
         return []
     try:
         parsed = json.loads(text)
         if isinstance(parsed, list):
-            return parsed
+            return [str(x) for x in parsed]
     except Exception:
         pass
     return []
 
 
-def complete_query_ids(df: pd.DataFrame, methods: list[str]) -> list[str]:
-    sub = df[df["mode"].isin(methods)]
-    counts = sub.groupby("query_id")["mode"].nunique()
-    return sorted(counts[counts == len(methods)].index.astype(str).tolist())
+def build_selected_document_text(documents: dict[str, str], doc_ids: list[str]) -> str:
+    blocks = []
+    for i, doc_id in enumerate(doc_ids, start=1):
+        text = documents.get(doc_id, "")
+        if not text:
+            text = "[document text not found in local dataset file]"
+        blocks.append(f"[{i}] {doc_id}: {text}")
+    return "\n\n".join(blocks)
 
 
-def score_interesting_queries(df: pd.DataFrame, qids: list[str]) -> list[tuple[float, str]]:
-    scored = []
+def numeric_value(row, column: str) -> float:
+    try:
+        value = row.get(column, 0.0)
+        if pd.isna(value):
+            return 0.0
+        return float(value)
+    except Exception:
+        return 0.0
 
-    for qid in qids:
-        sub = df[df["query_id"] == qid].set_index("mode")
 
-        fixed = sub.loc["fixed_10_full"]
-        heur = sub.loc["heuristic_rules_full"]
-        adapt = sub.loc["answer_aware_fallback"]
+def answer_quality_score(row) -> float:
+    """Composite score used only for selecting best/worst examples."""
+    return (
+        0.50 * numeric_value(row, "answer_f1")
+        + 0.30 * numeric_value(row, "semantic_similarity")
+        + 0.20 * numeric_value(row, "answer_coverage")
+    )
 
-        adapt_f1 = float(adapt.get("answer_f1", 0.0))
-        fixed_f1 = float(fixed.get("answer_f1", 0.0))
-        heur_f1 = float(heur.get("answer_f1", 0.0))
 
-        adapt_sem = float(adapt.get("semantic_similarity", 0.0))
-        fixed_sem = float(fixed.get("semantic_similarity", 0.0))
-        heur_sem = float(heur.get("semantic_similarity", 0.0))
+# --------------------------------------------------------------------------- #
+# Sampling
+# --------------------------------------------------------------------------- #
 
-        f1_disagreement = max(
-            abs(adapt_f1 - fixed_f1),
-            abs(adapt_f1 - heur_f1),
-            abs(fixed_f1 - heur_f1),
+def sample_dataset_rows(
+    answers_by_model: dict[str, pd.DataFrame],
+    best_count: int,
+    worst_count: int,
+    seed: int,
+) -> pd.DataFrame:
+    """Pool adaptive-method answers from all available models, score, return best+worst rows."""
+    frames = []
+    for model_family, df in answers_by_model.items():
+        tagged = df[df["mode"] == METHOD].copy()
+        tagged["_model_family"] = model_family
+        tagged["_model_name"] = MODEL_CONFIGS[model_family]["display"]
+        frames.append(tagged)
+
+    candidates = pd.concat(frames, ignore_index=True)
+    n_needed = best_count + worst_count
+    if len(candidates) < n_needed:
+        raise RuntimeError(
+            f"Only {len(candidates)} candidate answer rows; need {n_needed}"
         )
-        sem_disagreement = max(
-            abs(adapt_sem - fixed_sem),
-            abs(adapt_sem - heur_sem),
-            abs(fixed_sem - heur_sem),
+
+    candidates["_quality_score"] = candidates.apply(answer_quality_score, axis=1)
+    candidates["_pair_id"] = (
+        candidates["query_id"].astype(str) + "||" + candidates["_model_family"].astype(str)
+    )
+    used_pairs: set[str] = set()
+
+    def take_rows(frame: pd.DataFrame, count: int, reason: str) -> list[dict]:
+        rows: list[dict] = []
+        for _, row in frame.iterrows():
+            pair = str(row["_pair_id"])
+            if pair in used_pairs:
+                continue
+            item = row.drop(labels=["_quality_score", "_pair_id"]).to_dict()
+            item["_selection_reason"] = reason
+            item["_selection_score"] = round(float(row["_quality_score"]), 6)
+            rows.append(item)
+            used_pairs.add(pair)
+            if len(rows) == count:
+                break
+        return rows
+
+    selected: list[dict] = []
+    selected.extend(
+        take_rows(
+            candidates.sort_values(
+                ["_quality_score", "query_id", "mode"],
+                ascending=[False, True, True],
+            ),
+            best_count,
+            "best_metric_score",
         )
-        low_quality = 1.0 - adapt_f1
+    )
+    selected.extend(
+        take_rows(
+            candidates.sort_values(
+                ["_quality_score", "query_id", "mode"],
+                ascending=[True, True, True],
+            ),
+            worst_count,
+            "worst_metric_score",
+        )
+    )
 
-        score = (0.45 * f1_disagreement) + (0.35 * sem_disagreement) + (0.20 * low_quality)
-        scored.append((score, qid))
-
-    return sorted(scored, reverse=True)
-
-
-def sample_query_ids(df: pd.DataFrame, n_queries: int, seed: int) -> list[str]:
-    qids = complete_query_ids(df, METHODS)
-    if len(qids) < n_queries:
-        raise RuntimeError(f"Only {len(qids)} complete queries found; need {n_queries}")
-
-    rng = random.Random(seed)
-
-    ranked = score_interesting_queries(df, qids)
-
-    # Roughly half interesting/disagreement cases, half random cases.
-    n_interesting = max(1, n_queries // 2)
-    interesting = [qid for _, qid in ranked[:n_interesting]]
-
-    remaining = [qid for qid in qids if qid not in set(interesting)]
-    random_part = rng.sample(remaining, n_queries - len(interesting))
-
-    return sorted(interesting + random_part)
+    result = pd.DataFrame(selected)
+    return result.sample(frac=1.0, random_state=seed).reset_index(drop=True)
 
 
-def build_dataset_rows(dataset: str, config: dict, seed: int):
+# --------------------------------------------------------------------------- #
+# Per-dataset build
+# --------------------------------------------------------------------------- #
+
+def build_dataset_rows(
+    dataset: str,
+    config: dict,
+    seed: int,
+) -> tuple[list[dict], list[dict], dict]:
+    documents_path = find_existing_path(config["documents_candidates"], f"{dataset} documents")
     queries_path = find_existing_path(config["queries_candidates"], f"{dataset} queries")
-    answers_path = find_existing_path(config["answers_candidates"], f"{dataset} answers")
-
     print(f"\n[{dataset}]")
-    print(f"Queries: {queries_path}")
-    print(f"Answers: {answers_path}")
+    print(f"  Documents : {documents_path}")
+    print(f"  Queries   : {queries_path}")
 
+    documents = read_documents(documents_path)
     queries = read_queries(queries_path)
-    answers = pd.read_csv(answers_path)
 
-    required = {"query_id", "mode", "answer"}
-    missing = required - set(answers.columns)
-    if missing:
-        raise ValueError(f"{answers_path} missing required columns: {sorted(missing)}")
+    answers_by_model: dict[str, pd.DataFrame] = {}
+    answer_paths: dict[str, str] = {}
+    for model_family, candidates in config["answers_by_model"].items():
+        try:
+            path = find_existing_path(candidates, f"{dataset} {model_family} answers")
+        except FileNotFoundError as exc:
+            print(f"  WARNING: {exc} — skipping {model_family}")
+            continue
+        print(f"  Answers ({MODEL_CONFIGS[model_family]['display']}): {path}")
+        df = pd.read_csv(path)
+        missing = {"query_id", "mode", "answer"} - set(df.columns)
+        if missing:
+            raise ValueError(f"{path} missing required columns: {sorted(missing)}")
+        df["query_id"] = df["query_id"].astype(str)
+        df["mode"] = df["mode"].astype(str)
+        answers_by_model[model_family] = df
+        answer_paths[model_family] = str(path)
 
-    answers["query_id"] = answers["query_id"].astype(str)
-    answers["mode"] = answers["mode"].astype(str)
+    if not answers_by_model:
+        raise RuntimeError(f"No answer files found for dataset '{dataset}'")
 
-    n_queries = config["n_queries"]
-    sampled_qids = sample_query_ids(answers, n_queries=n_queries, seed=seed)
+    sampled = sample_dataset_rows(
+        answers_by_model,
+        best_count=config["best_items"],
+        worst_count=config["worst_items"],
+        seed=seed,
+    )
+    expected = config["best_items"] + config["worst_items"]
+    if len(sampled) != expected:
+        raise RuntimeError(f"Sampled {len(sampled)} rows for {dataset}; expected {expected}")
+    print(f"  Sampled   : {len(sampled)} items "
+          f"({config['best_items']} best + {config['worst_items']} worst)")
 
-    print(f"Sampled queries: {len(sampled_qids)}")
+    annotation_rows: list[dict] = []
 
-    annotation_rows = []
-    key_rows = []
-
-    # Dataset-specific blinded system mapping.
-    # This prevents System A from always meaning the same method across datasets.
-    rng = random.Random(seed + sum(ord(ch) for ch in dataset))
-    shuffled_methods = METHODS[:]
-    rng.shuffle(shuffled_methods)
-    system_labels = [f"System {chr(ord('A') + i)}" for i in range(len(shuffled_methods))]
-    method_to_system = dict(zip(shuffled_methods, system_labels))
-
-    print("Private system mapping:")
-    for method, system in method_to_system.items():
-        print(f"  {system}: {method}")
-
-    for local_idx, qid in enumerate(sampled_qids, start=1):
+    for local_idx, ans in enumerate(sampled.to_dict("records"), start=1):
+        qid = str(ans["query_id"])
         qrow = queries.get(qid, {})
-        query_text = clean_text(qrow.get("text", ""))
-        reference_answer = clean_text(qrow.get("reference_answer", ""))
-        relevant_doc_ids = qrow.get("relevant_doc_ids", [])
 
-        sub = answers[(answers["query_id"] == qid) & (answers["mode"].isin(METHODS))].copy()
-        sub = sub.sample(frac=1.0, random_state=seed + local_idx)
-
-        for _, ans in sub.iterrows():
-            mode = ans["mode"]
-            system = method_to_system[mode]
-            annotation_id = f"{dataset}_{local_idx:03d}_{system.replace(' ', '')}"
-
-            annotation_rows.append(
-                {
-                    "annotation_id": annotation_id,
-                    "dataset": dataset,
-                    "query_id": qid,
-                    "system": system,
-                    "query_text": query_text,
-                    "reference_answer": reference_answer,
-                    "generated_answer": clean_text(ans.get("answer", "")),
-                    "selected_doc_ids": json.dumps(
-                        parse_selected_doc_ids(ans.get("selected_doc_ids", "")),
-                        ensure_ascii=False,
-                    ),
-                    "relevant_doc_ids": json.dumps(relevant_doc_ids, ensure_ascii=False),
-                    "auto_answer_f1": ans.get("answer_f1", ""),
-                    "auto_answer_coverage": ans.get("answer_coverage", ""),
-                    "auto_semantic_similarity": ans.get("semantic_similarity", ""),
-                    "total_tokens": ans.get("total_tokens", ""),
-                    "fallback_used": ans.get("fallback_used", ""),
-                    "fallback_reason": clean_text(ans.get("fallback_reason", "")),
-                    "human_correctness": "",
-                    "human_failure_type": "",
-                    "human_notes": "",
-                }
+        if qrow:
+            query_text = clean_text(qrow.get("text", ""))
+            reference_answer = clean_text(qrow.get("reference_answer", ""))
+            relevant_doc_ids = qrow.get("relevant_doc_ids", [])
+        else:
+            query_text = (
+                f"[Missing source metadata for query {qid}. "
+                "The saved result was produced with a different prepared dataset file.]"
             )
-
-            key_rows.append(
-                {
-                    "annotation_id": annotation_id,
-                    "dataset": dataset,
-                    "query_id": qid,
-                    "system": system,
-                    "mode": mode,
-                    "method_name": METHOD_DISPLAY.get(mode, mode),
-                }
+            reference_answer = (
+                "[Missing reference answer — restore the matching prepared dataset before annotation.]"
             )
+            relevant_doc_ids = []
+
+        model_family = str(ans.get("_model_family", ""))
+        model_name = str(ans.get("_model_name", ""))
+        annotation_id = f"{dataset}_{local_idx:03d}"
+        selected_doc_ids = parse_selected_doc_ids(ans.get("selected_doc_ids", ""))
+
+        annotation_rows.append(
+            {
+                "annotation_id": annotation_id,
+                "candidate_id": annotation_id,
+                "dataset": dataset,
+                "dataset_name": DATASET_DISPLAY.get(dataset, dataset),
+                "model_family": model_family,
+                "model_name": model_name,
+                "method": METHOD_DISPLAY,
+                "query_id": qid,
+                "selection_reason": ans.get("_selection_reason", f"{dataset}_sample"),
+                "selection_score": ans.get("_selection_score", ""),
+                "query_text": query_text,
+                "reference_answer": reference_answer,
+                "model_answer": clean_text(ans.get("answer", "")),
+                "selected_doc_ids": json.dumps(selected_doc_ids, ensure_ascii=False),
+                "selected_document_text": build_selected_document_text(documents, selected_doc_ids),
+                "relevant_doc_ids": json.dumps(relevant_doc_ids, ensure_ascii=False),
+                "answer_f1": ans.get("answer_f1", ""),
+                "answer_coverage": ans.get("answer_coverage", ""),
+                "semantic_similarity": ans.get("semantic_similarity", ""),
+                "ndcg_at_10": ans.get("ndcg_at_10", ""),
+                "mrr_at_10": ans.get("mrr_at_10", ""),
+                "docs_used": ans.get("docs_used", ""),
+                "total_tokens": ans.get("total_tokens", ""),
+                "fallback_used": ans.get("fallback_used", ""),
+                "fallback_reason": clean_text(ans.get("fallback_reason", "")),
+                "rating": "",
+                "notes": "",
+            }
+        )
 
     metadata = {
         "dataset": dataset,
+        "documents_path": str(documents_path),
         "queries_path": str(queries_path),
-        "answers_path": str(answers_path),
-        "sampled_queries": len(sampled_qids),
-        "annotation_rows": len(annotation_rows),
+        "answers_paths": json.dumps(answer_paths, sort_keys=True),
+        "n_best": config["best_items"],
+        "n_worst": config["worst_items"],
+        "total_items": len(annotation_rows),
     }
 
-    return annotation_rows, key_rows, metadata
+    return annotation_rows, metadata
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--out-dir", default="annotation_workform/combined_llama70b_final")
-    parser.add_argument("--seed", type=int, default=0)
+# --------------------------------------------------------------------------- #
+# Output writers
+# --------------------------------------------------------------------------- #
+
+def write_browser_data(path: Path, rows: list[dict]) -> None:
+    """Write data.js consumed by the browser annotation form."""
+    browser_rows = [
+        {
+            "candidate_id": r["candidate_id"],
+            "annotation_id": r["annotation_id"],
+            "dataset": r["dataset"],
+            "dataset_name": r["dataset_name"],
+            "model_family": r["model_family"],
+            "model_name": r["model_name"],
+            "method": r["method"],
+            "selection_reason": r["selection_reason"],
+            "query_id": r["query_id"],
+            "selection_score": r["selection_score"],
+            "query_text": r["query_text"],
+            "reference_answer": r["reference_answer"],
+            "model_answer": r["model_answer"],
+            "selected_doc_ids": r["selected_doc_ids"],
+            "relevant_doc_ids": r["relevant_doc_ids"],
+            "selected_document_text": r["selected_document_text"],
+            "answer_f1": r["answer_f1"],
+            "answer_coverage": r["answer_coverage"],
+            "semantic_similarity": r["semantic_similarity"],
+            "ndcg_at_10": r["ndcg_at_10"],
+            "mrr_at_10": r["mrr_at_10"],
+            "docs_used": r["docs_used"],
+            "total_tokens": r["total_tokens"],
+            "fallback_used": r["fallback_used"],
+            "fallback_reason": r["fallback_reason"],
+        }
+        for r in rows
+    ]
+    payload = json.dumps(browser_rows, ensure_ascii=False, indent=2)
+    path.write_text(f"window.ANNOTATION_SAMPLES = {payload};\n", encoding="utf-8")
+
+
+def _col_letter(col_index: int) -> str:
+    """Convert 1-based column index to Excel letter (A, B, ..., Z, AA, ...)."""
+    result = ""
+    while col_index > 0:
+        col_index, remainder = divmod(col_index - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
+def write_excel_backup(path: Path, annotation_df: pd.DataFrame) -> None:
+    """Write an Excel workbook with one sheet per dataset plus an All sheet."""
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    rating_formula = '"' + ",".join(RATING_LABELS) + '"'
+    sheets = [
+        ("All Datasets", annotation_df),
+    ] + [
+        (DATASET_DISPLAY.get(ds, ds), annotation_df[annotation_df["dataset"] == ds])
+        for ds in DATASET_CONFIGS
+    ]
+
+    for sheet_name, df in sheets:
+        ws = wb.create_sheet(sheet_name)
+
+        edf = df.copy()
+        edf["evidence"] = edf["selected_document_text"].apply(
+            lambda x: (str(x)[:MAX_EVIDENCE_CHARS] + " [truncated…]")
+            if len(str(x)) > MAX_EVIDENCE_CHARS
+            else str(x)
+        )
+        edf["rating"] = ""
+        edf["notes"] = ""
+
+        present_cols = [c for c in EXCEL_COLUMNS if c in edf.columns]
+        ws.append(present_cols)
+
+        for _, row in edf.iterrows():
+            ws.append(
+                [
+                    str(row.get(c, ""))[:MAX_EVIDENCE_CHARS] if c not in ("rating", "notes") else ""
+                    for c in present_cols
+                ]
+            )
+
+        if "rating" in present_cols:
+            rating_col = _col_letter(present_cols.index("rating") + 1)
+            dv = DataValidation(
+                type="list",
+                formula1=rating_formula,
+                allow_blank=True,
+                showDropDown=False,
+            )
+            dv.sqref = f"{rating_col}2:{rating_col}{len(edf) + 1}"
+            ws.add_data_validation(dv)
+
+    wb.save(path)
+
+
+def write_readme(path: Path, annotation_df: pd.DataFrame, out_dir: Path) -> None:
+    total = len(annotation_df)
+    dataset_counts = annotation_df["dataset"].value_counts()
+    model_counts = annotation_df["model_family"].value_counts()
+
+    models_str = ", ".join(
+        f"{MODEL_CONFIGS[m]['display']} ({model_counts.get(m, 0)})"
+        for m in MODEL_CONFIGS
+        if m in model_counts.index
+    )
+
+    table_rows = "\n".join(
+        f"| {DATASET_DISPLAY.get(ds, ds)} | {dataset_counts.get(ds, 0)} |"
+        for ds in DATASET_CONFIGS
+    )
+
+    readme = f"""# Human Annotation Workform
+
+This folder contains the annotation materials for human evaluation of the **Main Adaptive Method**.
+
+## Design
+
+**{total} items total — 15 per dataset (8 best-scored + 7 worst-scored, pooled across models).**
+
+Method: {METHOD_DISPLAY} (`{METHOD}`)
+
+| Dataset | Items |
+|---------|-------|
+{table_rows}
+
+Models included: {models_str}
+
+Scores were used only to select examples (best 8, worst 7 per dataset).
+**Human ratings must be based on the answer content, not on metric values.**
+
+Quality score (selection only):
+`selection_score = 0.50 × answer_f1 + 0.30 × semantic_similarity + 0.20 × answer_coverage`
+
+## Files
+
+| File | Contents |
+|------|----------|
+| `annotation_items.csv` | All {total} items |
+| `annotation_items_scifact.csv` | SciFact subset ({dataset_counts.get('scifact', 0)} items) |
+| `annotation_items_hotpotqa.csv` | HotpotQA subset ({dataset_counts.get('hotpotqa', 0)} items) |
+| `annotation_items_bioasq.csv` | BioASQ subset ({dataset_counts.get('bioasq', 0)} items) |
+| `annotation_backup.xlsx` | Excel backup with per-dataset sheets and rating dropdown |
+| `source_files.csv` | Input file paths used |
+
+## Browser annotation workflow
+
+1. Open `annotation_workform/index.html` in your browser.
+2. Choose a dataset tab: **All ({total})**, **SciFact (15)**, **HotpotQA (15)**, or **BioASQ (15)**.
+3. For each item read the query, reference answer, model answer, and retrieved evidence.
+4. Fill **Rating** (required) and **Notes** (optional), then move to the next item.
+5. Click **Export CSV** to download all {total} items with your ratings.
+
+**Each annotator must use their own browser profile. Do not share a browser profile between annotators.**
+Progress is saved in browser localStorage. Export before switching machines or browsers.
+
+## Excel / CSV backup
+
+Use `annotation_backup.xlsx` or a per-dataset CSV if you prefer a spreadsheet.
+Fill only the **rating** column (dropdown provided) and **notes** column.
+The evidence column is truncated at {MAX_EVIDENCE_CHARS} characters; use the browser form for full evidence.
+
+## Rating labels
+
+| Label | When to use |
+|-------|-------------|
+| `CORRECT` | Answer contains the required information and does not contradict the reference |
+| `PARTIALLY_CORRECT` | Answer contains some required information but is incomplete, vague, or misses an important condition |
+| `INCORRECT` | Answer contradicts the reference or gives a different answer |
+| `NOT_ENOUGH_INFO` | Answer cannot be judged confidently from the query, reference, and retrieved evidence |
+
+## Kappa workflow (after both annotators finish)
+
+1. Open `annotation_workform/kappa.html`.
+2. Drop Annotator 1's exported CSV into the first upload box.
+3. Drop Annotator 2's exported CSV into the second upload box.
+4. Item identifier column: `candidate_id` — Rating column: `rating`.
+5. Click **Calculate**.
+"""
+    path.write_text(readme, encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# Main
+# --------------------------------------------------------------------------- #
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--out-dir",
+        default="annotation_workform/csv_backups",
+        help="Output directory for CSV backups (default: annotation_workform/csv_backups)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed (default: 42)",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    all_annotation_rows = []
-    all_key_rows = []
-    metadata_rows = []
+    all_annotation_rows: list[dict] = []
+    metadata_rows: list[dict] = []
 
     for dataset, config in DATASET_CONFIGS.items():
-        annotation_rows, key_rows, metadata = build_dataset_rows(dataset, config, args.seed)
+        annotation_rows, metadata = build_dataset_rows(dataset, config, args.seed)
         all_annotation_rows.extend(annotation_rows)
-        all_key_rows.extend(key_rows)
         metadata_rows.append(metadata)
 
     annotation_df = pd.DataFrame(all_annotation_rows)
-    key_df = pd.DataFrame(all_key_rows)
     metadata_df = pd.DataFrame(metadata_rows)
 
-    annotation_path = out_dir / "annotation_items_blinded.csv"
-    key_path = out_dir / "annotation_key_private.csv"
-    metadata_path = out_dir / "source_files.csv"
+    # CSV backups
+    annotation_df.to_csv(out_dir / "all_items.csv", index=False)
+    for dataset in DATASET_CONFIGS:
+        subset = annotation_df[annotation_df["dataset"] == dataset]
+        subset.to_csv(out_dir / f"{dataset}.csv", index=False)
+    metadata_df.to_csv(out_dir / "source_files.csv", index=False)
 
-    annotation_df.to_csv(annotation_path, index=False)
-    key_df.to_csv(key_path, index=False)
-    metadata_df.to_csv(metadata_path, index=False)
+    # Excel backup (placed at annotation_workform root for easy access)
+    excel_path = Path("annotation_workform/annotation_backup.xlsx")
+    write_excel_backup(excel_path, annotation_df)
+    print(f"\nExcel backup  : {excel_path}")
 
-    readme = f"""# Combined Llama-70B Human Annotation Workform
+    # Browser data
+    browser_data_path = Path("annotation_workform/data.js")
+    write_browser_data(browser_data_path, all_annotation_rows)
 
-This folder contains the combined blinded annotation workform for the final Llama-70B experiments.
-
-## Annotation design
-
-The workform samples answers from three datasets:
-
-- SciFact: 13 queries x 3 systems = 39 answers
-- HotpotQA: 13 queries x 3 systems = 39 answers
-- BioASQ: 8 queries x 3 systems = 24 answers
-
-Total: {len(annotation_df)} answers.
-
-Only one LLM is used: `meta-llama/Llama-3.3-70B-Instruct`.
-
-## Systems included
-
-For each sampled query, annotators compare three blinded systems:
-
-- Fixed Top-10
-- Heuristic Rules
-- Main Adaptive Method
-
-Only the final report modes are included:
-
-- `fixed_10_full`
-- `heuristic_rules_full`
-- `answer_aware_fallback`
-
-Extra raw experimental rows such as `fixed_3_full`, `fixed_5_full`, compressed fixed baselines, and no-retrieval rows are intentionally excluded from annotation.
-
-## Files
-
-- `annotation_items_blinded.csv`: give this to annotators.
-- `annotation_key_private.csv`: private method mapping; do not give this to annotators during blind annotation.
-- `source_files.csv`: records which result/query files were used.
-- `README.md`: this file.
-
-## Annotation labels
-
-Fill the `human_correctness` column with one of:
-
-- `correct`: the answer contains the required information and does not contradict the reference.
-- `partial`: the answer contains some required information but is incomplete, vague, or misses an important condition.
-- `wrong`: the answer contradicts the reference or gives a different answer.
-- `unclear`: the answer cannot be judged confidently from the query and reference.
-
-Optionally fill `human_failure_type` with one of:
-
-- `retrieval_failure`
-- `context_selection_failure`
-- `generation_failure`
-- `evaluation_mismatch`
-- `insufficient_evidence`
-- `none`
-
-## Annotation instructions
-
-Judge the generated answer against the query and the reference answer.
-
-The automatic metrics are included for later analysis, but human labels should be based on the answer content, not on the metric values.
-
-The `annotation_key_private.csv` file should remain hidden until annotation is complete.
-"""
-
-    (out_dir / "README.md").write_text(readme, encoding="utf-8")
-
-    print(f"\nWrote combined annotation workform to: {out_dir}")
-    print(f"Rows: {len(annotation_df)}")
-    print("\nRows by dataset:")
+    total = len(annotation_df)
+    print(f"CSV backups   : {out_dir}")
+    print(f"Browser data  : {browser_data_path}")
+    print(f"Total items   : {total}")
+    print("\nItems by dataset:")
     print(annotation_df["dataset"].value_counts().to_string())
-    print("\nRows by blinded system:")
-    print(annotation_df["system"].value_counts().to_string())
+    print("\nItems by model:")
+    print(annotation_df["model_family"].value_counts().to_string())
+    print("\nDone.")
 
 
 if __name__ == "__main__":
