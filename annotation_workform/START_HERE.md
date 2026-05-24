@@ -70,7 +70,7 @@ You can also import a JSON file using **Import JSON** if you exported in that fo
 
 ---
 
-## Prefer a spreadsheet? Please consult with the other annotator(s) as well
+## Prefer a spreadsheet? Please consult with the other annotator(s) as well as the project members to ensure the data formatting matches between annotators
 
 Open **`backup_files/annotation_backup.xlsx`**.
 Each dataset is a separate sheet (SciFact, HotpotQA, BioASQ).
