@@ -79,8 +79,6 @@ Return the completed Excel file to the project lead.
 !! Note that you will ned to convert the excel to CSV if you or the other Annotators
  want to use the Kappa automated calculator page built wihtin kappa.html
 
-Per-dataset CSVs are also in `backup_files/` if you prefer working in one section at a time.
-
 ---
 
 ## Tips
