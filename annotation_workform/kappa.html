@@ -10,7 +10,7 @@
     <header class="app-header">
       <div>
         <h1>RAG Kappa Calculator</h1>
-        <p>Drop two annotator CSV exports to compute agreement and Cohen's kappa.</p>
+        <p>Drop two annotator CSV exports to compute agreement and Cohen's kappa. Comma- and semicolon-separated files are supported.</p>
       </div>
       <div class="header-actions">
         <a class="button-link" href="./index.html">Annotation form</a>
@@ -36,7 +36,7 @@
           <label>
             ID column
             <select id="idColumn">
-              <option value="auto">Auto: candidate_id or sample_id</option>
+              <option value="auto">Auto: candidate_id, sample_id, or query_id</option>
               <option value="candidate_id">candidate_id</option>
               <option value="sample_id">sample_id</option>
               <option value="query_id">query_id</option>

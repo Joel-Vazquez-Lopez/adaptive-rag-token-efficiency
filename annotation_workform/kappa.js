@@ -25,7 +25,17 @@
     disagreementTable: document.querySelector("#disagreementTable tbody"),
   };
 
+  function detectDelimiter(text) {
+    const firstLine = text.split(/\r?\n/).find((line) => line.trim()) || "";
+    const delimiters = [",", ";", "\t"];
+    return delimiters.reduce((best, delimiter) => {
+      const count = firstLine.split(delimiter).length - 1;
+      return count > best.count ? { delimiter, count } : best;
+    }, { delimiter: ",", count: 0 }).delimiter;
+  }
+
   function parseCsv(text) {
+    const delimiter = detectDelimiter(text);
     const rows = [];
     let row = [];
     let cell = "";
@@ -45,7 +55,7 @@
         }
       } else if (char === "\"") {
         inQuotes = true;
-      } else if (char === ",") {
+      } else if (char === delimiter) {
         row.push(cell);
         cell = "";
       } else if (char === "\n") {
