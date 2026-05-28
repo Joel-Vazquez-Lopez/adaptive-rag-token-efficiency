@@ -453,6 +453,40 @@ html, body {
 #welcome p  { font-size: 22px; color: #555; line-height: 2.0; max-width: 900px; }
 #welcome .hint { font-size: 18px; color: #999; animation: blink 1.5s step-start infinite; margin-top: 18px; }
 #welcome .authors { font-size: 18px; color: #888; line-height: 2.25; }
+
+#deco-corner {
+  position: absolute;
+  bottom: 8px;
+  right: 0;
+  z-index: 3;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.72;
+}
+#deco-bubble {
+  display: none;
+  background: var(--sky);
+  border: 2px solid var(--col);
+  padding: 5px 11px;
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  color: var(--text);
+  white-space: nowrap;
+  position: relative;
+}
+#deco-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 9px solid var(--col);
+}
 </style>
 </head>
 <body>
@@ -490,6 +524,7 @@ html, body {
     <div id="content-box">
       <div id="section-title">—</div>
       <div id="slide-text"></div>
+      <div id="deco-corner"><div id="deco-bubble"></div><canvas id="deco-canvas" width="90" height="90"></canvas></div>
     </div>
 
     <div id="bottom-nav">
@@ -837,6 +872,139 @@ const CHARS = {
     r(ctx,13,21,  5,3, '#102452');
   }
 };
+
+
+// ── Decorations ───────────────────────────────────────────────
+const PD = 3;
+function rd(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x*PD, y*PD, w*PD, h*PD); }
+
+const DECOS = {
+  introduction(ctx) {
+    ctx.save(); ctx.translate(30, 30); CHARS.bard(ctx); ctx.restore();
+  },
+  related(ctx) {
+    // Open book
+    rd(ctx, 0, 2,10,12,'#f0ead0'); rd(ctx,10, 2,10,12,'#ede7c7');
+    rd(ctx, 9, 1, 2,13,'#7a4a20');
+    rd(ctx, 0, 0,10, 1,'#8b5a2b'); rd(ctx,10, 0,10, 1,'#8b5a2b');
+    rd(ctx, 0,14,20, 2,'#8b5a2b');
+    rd(ctx, 1, 4, 7, 1,'#bbb8a0'); rd(ctx, 1, 6, 8, 1,'#bbb8a0');
+    rd(ctx, 1, 8, 6, 1,'#bbb8a0'); rd(ctx, 1,10, 7, 1,'#bbb8a0');
+    rd(ctx,12, 4, 7, 1,'#bbb8a0'); rd(ctx,11, 6, 8, 1,'#bbb8a0');
+    rd(ctx,12, 8, 6, 1,'#bbb8a0'); rd(ctx,11,10, 7, 1,'#bbb8a0');
+    rd(ctx,16, 0, 2, 6,'#c9a84c');
+  },
+  approach(ctx) {
+    // Two potion bottles
+    rd(ctx, 2, 0, 2, 1,'#5a3a10'); rd(ctx, 2, 1, 2, 3,'#3a8a3a');
+    rd(ctx, 0, 4, 6, 9,'#2d6a2d'); rd(ctx, 1, 8, 4, 4,'#cc2222');
+    rd(ctx, 1, 5, 1, 2,'#88cc88'); rd(ctx, 4, 9, 1, 1,'#ff8888');
+    rd(ctx,12, 0, 2, 1,'#5a3a10'); rd(ctx,12, 1, 2, 3,'#2255aa');
+    rd(ctx,10, 4, 6, 9,'#1a4488'); rd(ctx,11, 8, 4, 4,'#44aaff');
+    rd(ctx,11, 5, 1, 2,'#88aadd'); rd(ctx,14, 9, 1, 1,'#99ddff');
+  },
+  budget(ctx) {
+    // Rolled scroll
+    rd(ctx, 0, 4, 2, 8,'#8b5a2b'); rd(ctx,16, 4, 2, 8,'#8b5a2b');
+    rd(ctx, 2, 3,14, 1,'#a07828'); rd(ctx, 2,12,14, 1,'#a07828');
+    rd(ctx, 2, 4,14, 8,'#f0ead0');
+    rd(ctx, 4, 5, 8, 1,'#aaa898'); rd(ctx, 3, 7,10, 1,'#aaa898');
+    rd(ctx, 4, 9, 7, 1,'#aaa898'); rd(ctx, 3,11, 9, 1,'#aaa898');
+    rd(ctx,19, 0, 2,18,'#8b5a2b'); rd(ctx,20, 1, 1,16,'#f0ead0');
+  },
+  compression(ctx) {
+    // Arrow pointing right
+    rd(ctx, 0, 6,15, 3,'#5a3a10');
+    rd(ctx,12, 3, 5, 9,'#5a3a10'); rd(ctx,15, 5, 3, 5,'#8b5a2b');
+    rd(ctx, 0, 4, 4, 2,'#5a3a10'); rd(ctx, 0,10, 4, 2,'#5a3a10');
+    // Arrow pointing up
+    rd(ctx,22, 2, 3,18,'#7a4a20');
+    rd(ctx,19, 2, 9, 3,'#7a4a20'); rd(ctx,21, 5, 5, 3,'#8b5a2b');
+    rd(ctx,21,20, 1, 2,'#5a3a10'); rd(ctx,24,20, 1, 2,'#5a3a10');
+  },
+  fallback(ctx) {
+    // Three stars
+    rd(ctx, 9, 5, 2,10,'#c9a84c'); rd(ctx, 5, 9,10, 2,'#c9a84c');
+    rd(ctx, 7, 7, 2, 2,'#c9a84c'); rd(ctx,11, 7, 2, 2,'#c9a84c');
+    rd(ctx, 7,11, 2, 2,'#c9a84c'); rd(ctx,11,11, 2, 2,'#c9a84c');
+    rd(ctx, 9, 9, 2, 2,'#ffd700');
+    rd(ctx,20, 1, 1, 5,'#c9a84c'); rd(ctx,18, 3, 5, 1,'#c9a84c');
+    rd(ctx, 1,22, 1, 4,'#a07828'); rd(ctx, 0,24, 3, 1,'#a07828');
+  },
+  setup(ctx) {
+    // Compass rose
+    rd(ctx, 9, 0, 2, 7,'#c9a84c'); rd(ctx, 7, 0, 6, 3,'#c9a84c');
+    rd(ctx, 9,14, 2, 7,'#a07828'); rd(ctx, 7,18, 6, 2,'#a07828');
+    rd(ctx, 0, 9, 7, 2,'#a07828'); rd(ctx, 0, 7, 3, 6,'#a07828');
+    rd(ctx,14, 9, 7, 2,'#c9a84c'); rd(ctx,18, 7, 3, 6,'#c9a84c');
+    rd(ctx, 8, 8, 4, 4,'#5a3a10'); rd(ctx, 9, 9, 2, 2,'#c9a84c');
+    rd(ctx, 4, 3, 3, 3,'#d0b86a'); rd(ctx,14, 3, 3, 3,'#d0b86a');
+    rd(ctx, 4,15, 3, 3,'#d0b86a'); rd(ctx,14,15, 3, 3,'#d0b86a');
+  },
+  results(ctx) {
+    // Sword + shield
+    rd(ctx, 5, 0, 2,15,'#c8c8c8'); rd(ctx, 6, 1, 1,12,'#e8e8e8');
+    rd(ctx, 1,14,10, 2,'#c9a84c'); rd(ctx, 5,16, 2, 8,'#8b5a2b');
+    rd(ctx, 4,24, 4, 2,'#5a3a10');
+    rd(ctx,14, 1, 9,11,'#1a3a8a'); rd(ctx,13, 3,11, 7,'#1a3a8a');
+    rd(ctx,15,12, 7, 4,'#1a3a8a'); rd(ctx,17,16, 3, 3,'#1a3a8a'); rd(ctx,18,19, 1, 1,'#1a3a8a');
+    rd(ctx,14, 1, 9, 1,'#c9a84c'); rd(ctx,13, 3, 1,13,'#c9a84c'); rd(ctx,22, 3, 1,13,'#c9a84c');
+    rd(ctx,17, 3, 2,17,'#c9a84c'); rd(ctx,13, 8,10, 2,'#c9a84c');
+  },
+  analysis(ctx) {
+    // Crystal ball on stand
+    rd(ctx, 6,21, 8, 2,'#5a3a10'); rd(ctx, 8,18, 4, 3,'#7a4a20'); rd(ctx, 6,15, 8, 3,'#8b5a2b');
+    rd(ctx, 4, 1,12, 2,'#c8d8f0'); rd(ctx, 2, 3,16, 2,'#c8d8f0');
+    rd(ctx, 1, 5,18, 8,'#c8d8f0'); rd(ctx, 2,13,16, 2,'#c8d8f0'); rd(ctx, 4,15,12, 1,'#c8d8f0');
+    rd(ctx, 5, 3,10,10,'#d8eaff'); rd(ctx, 6, 5, 8, 7,'#e4f0ff');
+    rd(ctx, 9, 6, 2, 6,'#6688cc'); rd(ctx, 7, 8, 6, 2,'#6688cc');
+    rd(ctx, 3, 3, 2, 3,'#ffffff');
+  },
+  ablation(ctx) {
+    // Gear/cog
+    rd(ctx, 8, 0, 4, 5,'#888888'); rd(ctx, 8,15, 4, 5,'#888888');
+    rd(ctx, 0, 8, 5, 4,'#888888'); rd(ctx,15, 8, 5, 4,'#888888');
+    rd(ctx, 2, 2, 4, 4,'#888888'); rd(ctx,14, 2, 4, 4,'#888888');
+    rd(ctx, 2,14, 4, 4,'#888888'); rd(ctx,14,14, 4, 4,'#888888');
+    rd(ctx, 5, 5,10,10,'#777777'); rd(ctx, 6, 6, 8, 8,'#999999');
+    rd(ctx, 8, 8, 4, 4,'#bbbbbb'); rd(ctx, 9, 9, 2, 2,'#ddd8c4');
+  },
+  annotation(ctx) {
+    // Quill + ink pot
+    rd(ctx, 0,13, 3, 3,'#2a2a2a'); rd(ctx, 1,11, 2, 2,'#555');
+    rd(ctx, 2, 9, 2, 3,'#f5f0e0'); rd(ctx, 3, 7, 2, 3,'#eee8d0');
+    rd(ctx, 4, 5, 3, 3,'#e0d8b8'); rd(ctx, 5, 3, 4, 3,'#d8d0a8');
+    rd(ctx, 7, 1, 5, 3,'#ccc888'); rd(ctx, 9, 0, 4, 2,'#bbb870');
+    rd(ctx, 1,15, 2, 1,'#1a1a2e');
+    rd(ctx,13, 7, 2, 1,'#666'); rd(ctx,12, 8, 4, 1,'#555'); rd(ctx,11, 9, 6, 1,'#444');
+    rd(ctx,10,10, 8, 6,'#2a2a2a'); rd(ctx,11,11, 6, 4,'#1a1a2e');
+    rd(ctx,10,16, 8, 1,'#2a2a2a');
+  },
+  conclusion(ctx) {
+    // Heraldic shield
+    rd(ctx, 1, 0,18,13,'#1a3a8a'); rd(ctx, 0, 2,20, 9,'#1a3a8a');
+    rd(ctx, 3,13,14, 5,'#1a3a8a'); rd(ctx, 6,18, 8, 3,'#1a3a8a'); rd(ctx, 9,21, 2, 2,'#1a3a8a');
+    rd(ctx, 9, 1, 2,22,'#c9a84c'); rd(ctx, 1, 8,18, 2,'#c9a84c');
+    rd(ctx, 1, 0,18, 1,'#c9a84c'); rd(ctx, 0, 2, 1,11,'#c9a84c'); rd(ctx,19, 2, 1,11,'#c9a84c');
+    rd(ctx, 3,13, 1, 5,'#c9a84c'); rd(ctx,16,13, 1, 5,'#c9a84c');
+    rd(ctx, 6,18, 1, 3,'#c9a84c'); rd(ctx,13,18, 1, 3,'#c9a84c');
+  }
+};
+
+function drawDeco(sectionId) {
+  const corner = document.getElementById('deco-corner');
+  const bubble = document.getElementById('deco-bubble');
+  const canvas = document.getElementById('deco-canvas');
+  const ctx    = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 90, 90);
+  bubble.style.display = 'none';
+  corner.style.display = 'flex';
+  if (DECOS[sectionId]) DECOS[sectionId](ctx);
+  if (sectionId === 'introduction') {
+    bubble.textContent = 'HEAR YE, HEAR YE!';
+    bubble.style.display = 'block';
+  }
+}
 
 function drawCharacter(type) {
   const canvas = document.getElementById('portrait-canvas');
@@ -1190,6 +1358,7 @@ function render() {
   }).join('');
   showHtml(html);
   document.getElementById('slide-text').scrollTop = 0;
+  drawDeco(sec.id);
 }
 
 function showHtml(html) {
@@ -1235,6 +1404,7 @@ document.addEventListener('keydown', e => {
     document.getElementById('slide-counter').textContent = '— / —';
     document.getElementById('btn-prev').disabled = true;
     document.getElementById('btn-next').disabled = true;
+    document.getElementById('deco-corner').style.display = 'none';
     drawIdle();
     applyColor('#ffd700');
   }
