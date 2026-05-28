@@ -8,12 +8,12 @@
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --gold:  #ffd700;
+  --gold:  #c9a84c;
   --sky:   #0d0d1f;
   --panel: #0a0a1e;
-  --text:  #e8e8e8;
+  --text:  #d8d8d8;
   --dim:   #666;
-  --col:   #ffd700;
+  --col:   #c9a84c;
 }
 html, body {
   width: 100%; height: 100%;
@@ -159,7 +159,7 @@ body::after {
 #topbar .title-main {
   font-size: 8.5px;
   color: var(--col);
-  text-shadow: 0 0 10px var(--col);
+  text-shadow: none;
   letter-spacing: 1px;
 }
 #topbar .title-sub {
@@ -185,10 +185,10 @@ body::after {
 #section-title {
   font-size: 15px;
   color: var(--col);
-  text-shadow: 0 0 12px var(--col);
-  border-bottom: 2px solid var(--col);
+  text-shadow: none;
+  border-bottom: 1px solid rgba(201,168,76,.4);
   padding-bottom: 14px;
-  transition: color .3s, border-color .3s, text-shadow .3s;
+  transition: color .3s, border-color .3s;
   letter-spacing: .5px;
   line-height: 1.6;
 }
@@ -208,6 +208,14 @@ body::after {
 #slide-text .slide-inner {
   width: 100%;
 }
+.slide-para {
+  margin-bottom: 22px;
+  line-height: 2.35;
+}
+.slide-block {
+  margin-bottom: 28px;
+}
+.slide-para:last-child, .slide-block:last-child { margin-bottom: 0; }
 #slide-text::-webkit-scrollbar { width: 8px; height: 8px; }
 #slide-text::-webkit-scrollbar-thumb { background: var(--col); }
 #slide-text::-webkit-scrollbar-track { background: #111133; }
@@ -223,7 +231,7 @@ body::after {
   color: var(--col);
   font-size: 24px;
   line-height: 1.8;
-  text-shadow: 0 0 10px var(--col);
+  text-shadow: none;
   margin-bottom: 20px;
 }
 #slide-text .small {
@@ -363,8 +371,8 @@ body::after {
   font-weight: normal;
 }
 .result-table td.num { text-align: right; white-space: nowrap; }
-.result-table .good { color: #7dffb2; }
-.result-table .warn { color: #ffd47d; }
+.result-table .good { color: #5db88a; }
+.result-table .warn { color: #c98844; }
 .slide-note {
   margin-top: 12px;
   color: #aaa;
@@ -446,7 +454,7 @@ body::after {
   text-align: center;
   padding: 40px;
 }
-#welcome h1 { font-size: 30px; color: var(--gold); text-shadow: 0 0 26px var(--gold); line-height: 1.65; }
+#welcome h1 { font-size: 30px; color: var(--gold); text-shadow: none; line-height: 1.65; }
 #welcome p  { font-size: 13px; color: #aaa; line-height: 2.35; max-width: 900px; }
 #welcome .hint { font-size: 9.5px; color: #777; animation: blink 1.5s step-start infinite; margin-top: 18px; }
 #welcome .authors { font-size: 8.7px; color: #777; line-height: 2.25; }
@@ -1149,45 +1157,29 @@ function openSection(idx) {
   render();
 }
 
-function applyColor(col) {
-  document.documentElement.style.setProperty('--col', col);
-  document.getElementById('sidebar').style.borderColor = col;
-  document.getElementById('portrait-canvas').style.borderColor = col;
-  document.getElementById('portrait-canvas').style.boxShadow =
-    `inset 0 0 18px rgba(0,0,0,.7), 0 0 20px ${col}`;
-  document.getElementById('portrait-label').style.color = col;
-  document.getElementById('section-title').style.color = col;
-  document.getElementById('section-title').style.borderColor = col;
-  document.getElementById('section-title').style.textShadow = `0 0 12px ${col}`;
-  document.querySelectorAll('.btn').forEach(b => {
-    b.style.color = col; b.style.borderColor = col;
-  });
-  document.getElementById('topbar').style.borderColor = col;
-}
+function applyColor(_col) { /* single consistent color from CSS */ }
 
 function navigate(dir) {
-  if (currentIdx < 0) return;
-  const max = SECTIONS[currentIdx].slides.length - 1;
-  slide = Math.max(0, Math.min(max, slide + dir));
-  render();
+  const next = Math.max(0, Math.min(SECTIONS.length - 1, currentIdx + dir));
+  if (next !== currentIdx) openSection(next);
 }
 
 function render() {
   const sec = SECTIONS[currentIdx];
-  const item = sec.slides[slide];
   drawCharacter(sec.char);
   document.getElementById('portrait-label').textContent = sec.name;
   document.getElementById('section-title').textContent = sec.title;
-  document.getElementById('btn-prev').disabled = slide === 0;
-  document.getElementById('btn-next').disabled = slide === sec.slides.length - 1;
-  document.getElementById('slide-counter').textContent = `${slide + 1} / ${sec.slides.length}`;
-  if (typeof item === 'string') {
-    typewrite(item);
-  } else if (item.html) {
-    showHtml(item.html);
-  } else if (item.text) {
-    typewrite(item.text);
-  }
+  document.getElementById('btn-prev').disabled = currentIdx <= 0;
+  document.getElementById('btn-next').disabled = currentIdx >= SECTIONS.length - 1;
+  document.getElementById('slide-counter').textContent = `${currentIdx + 1} / ${SECTIONS.length}`;
+
+  const html = sec.slides.map(item => {
+    if (typeof item === 'string') return `<p class="slide-para">${item}</p>`;
+    if (item.html) return `<div class="slide-block">${item.html}</div>`;
+    return '';
+  }).join('');
+  showHtml(html);
+  document.getElementById('slide-text').scrollTop = 0;
 }
 
 function showHtml(html) {

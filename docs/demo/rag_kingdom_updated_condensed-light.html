@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The RAG Kingdom — Adaptive Context Selection</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --gold:  #a07828;
+  --sky:   #f4f0e8;
+  --panel: #ebe7d8;
+  --text:  #1a1a2e;
+  --dim:   #777;
+  --col:   #a07828;
+}
+html, body {
+  width: 100%; height: 100%;
+  background: var(--sky);
+  font-family: 'VT323', monospace;
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* scanline overlay removed */
+
+/* ── Root layout: sidebar + main ── */
+#app {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ── LEFT SIDEBAR ── */
+#sidebar {
+  width: 305px;
+  flex-shrink: 0;
+  background: #e8e4d4;
+  border-right: 3px solid var(--col);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 22px 14px 16px;
+  gap: 16px;
+  transition: border-color .3s;
+  position: relative;
+  overflow: hidden;
+}
+#sidebar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, rgba(160,120,40,.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* portrait */
+#portrait-canvas {
+  width: 158px; height: 158px;
+  border: 3px solid var(--col);
+  background: #ddd8c4;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 10px rgba(0,0,0,.15), 0 0 0 1px var(--col);
+  transition: border-color .3s, box-shadow .3s;
+  flex-shrink: 0;
+}
+#portrait-label {
+  font-size: 15px;
+  color: var(--col);
+  text-align: center;
+  line-height: 1.8;
+  transition: color .3s;
+  max-width: 230px;
+}
+
+/* nav list */
+#nav-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+#nav-list::-webkit-scrollbar { display: none; }
+
+.nav-item {
+  width: 100%;
+  background: transparent;
+  border: 1px solid #ccc8b4;
+  color: #888;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  padding: 14px 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  line-height: 1.75;
+  letter-spacing: .3px;
+}
+.nav-item:hover { background: rgba(0,0,0,.05); color: #444; border-color: #aaa; }
+.nav-item.active { background: rgba(160,120,40,.12); color: var(--col); border-color: var(--col); }
+
+#sidebar-footer {
+  font-size: 13px;
+  color: #999;
+  text-align: center;
+  line-height: 2;
+}
+
+/* ── MAIN CONTENT AREA ── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  position: relative;
+  background: var(--sky);
+}
+
+/* background star field */
+#stars-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.star {
+  position: absolute; background: #c8c0a8; border-radius: 50%;
+  animation: twinkle var(--dur, 3s) ease-in-out infinite var(--del, 0s);
+}
+@keyframes twinkle {
+  0%,100%{opacity:.7;transform:scale(1)}
+  50%{opacity:.1;transform:scale(.5)}
+}
+
+/* top bar */
+#topbar {
+  position: relative; z-index: 2;
+  height: 54px;
+  background: rgba(232,228,212,.97);
+  border-bottom: 2px solid var(--col);
+  display: flex;
+  align-items: center;
+  padding: 0 34px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+#topbar .title-main {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8.5px;
+  color: var(--col);
+  text-shadow: none;
+  letter-spacing: 1px;
+}
+#topbar .title-sub {
+  font-size: 17px;
+  color: #888;
+  margin-left: auto;
+}
+
+/* content box */
+#content-box {
+  position: relative; z-index: 2;
+  flex: 1;
+  width: min(1380px, calc(100% - 96px));
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 28px 0 20px;
+  gap: 16px;
+  min-height: 0;
+}
+
+#section-title {
+  font-size: 32px;
+  color: var(--col);
+  text-shadow: none;
+  border-bottom: 1px solid rgba(160,120,40,.3);
+  padding-bottom: 14px;
+  transition: color .3s, border-color .3s;
+  letter-spacing: .5px;
+  line-height: 1.6;
+}
+
+#slide-text {
+  font-size: 24px;
+  line-height: 1.85;
+  color: var(--text);
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  display: block;
+  padding-top: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--col) #e8e4d4;
+}
+#slide-text .slide-inner {
+  width: 100%;
+}
+.slide-para {
+  margin-bottom: 14px;
+  line-height: 1.85;
+}
+.slide-block {
+  margin-bottom: 28px;
+}
+.slide-para:last-child, .slide-block:last-child { margin-bottom: 0; }
+#slide-text::-webkit-scrollbar { width: 8px; height: 8px; }
+#slide-text::-webkit-scrollbar-thumb { background: var(--col); }
+#slide-text::-webkit-scrollbar-track { background: #e8e4d4; }
+#slide-text .kicker {
+  display: block;
+  color: var(--col);
+  font-size: 26px;
+  line-height: 2;
+  margin-top: 14px;
+  margin-bottom: 10px;
+}
+#slide-text .big-line {
+  display: block;
+  color: var(--col);
+  font-size: 40px;
+  line-height: 1.6;
+  text-shadow: none;
+  margin-bottom: 20px;
+}
+#slide-text .small {
+  color: #888;
+  font-size: 18px;
+  line-height: 2.0;
+}
+#slide-text ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+#slide-text li {
+  margin-bottom: 10px;
+}
+#slide-text li::before {
+  content: ">";
+  color: var(--col);
+  margin-right: 8px;
+}
+.pipeline-map {
+  height: 500px;
+  margin-top: 14px;
+  position: relative;
+}
+.pipeline-step {
+  border: 2px solid rgba(102,170,255,.45);
+  background:
+    linear-gradient(180deg, rgba(102,170,255,.13), rgba(255,255,255,.025)),
+    rgba(10,10,30,.72);
+  padding: 16px 18px;
+  min-height: 104px;
+  position: absolute;
+  width: 30%;
+  box-shadow: inset 0 0 18px rgba(0,0,0,.55), 0 0 16px rgba(102,170,255,.12);
+  overflow: hidden;
+}
+.pipeline-step::before {
+  content: "";
+  position: absolute;
+  inset: 8px auto auto 8px;
+  width: 13px;
+  height: 13px;
+  border-style: solid;
+  border-color: var(--col);
+  border-width: 2px 0 0 2px;
+  opacity: .6;
+}
+.pipeline-step::after {
+  content: "";
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  width: 10px;
+  height: 10px;
+  border-style: solid;
+  border-color: var(--col);
+  border-width: 0 2px 2px 0;
+  opacity: .45;
+}
+.pipeline-step.p1 { left: 0; top: 0; }
+.pipeline-step.p2 { left: 35%; top: 0; }
+.pipeline-step.p3 { right: 0; top: 0; }
+.pipeline-step.p4 { right: 0; top: 192px; }
+.pipeline-step.p5 { left: 35%; top: 192px; }
+.pipeline-step.p6 { left: 0; top: 192px; }
+.pipeline-step.p7 { left: 0; top: 384px; }
+.pipeline-step.p8 { left: 35%; top: 384px; }
+.pipeline-step.p9 { right: 0; top: 384px; }
+.pipeline-step.result {
+  border-color: rgba(125,255,178,.5);
+  background:
+    linear-gradient(180deg, rgba(125,255,178,.10), rgba(255,255,255,.025)),
+    rgba(10,10,30,.72);
+}
+.pipeline-step .num {
+  display: block;
+  color: var(--col);
+  font-size: 7.6px;
+  line-height: 1.8;
+  margin-bottom: 6px;
+  padding-left: 24px;
+}
+.pipeline-step .label {
+  display: block;
+  color: #f2f2f2;
+  font-size: 12.2px;
+  line-height: 1.75;
+  margin-bottom: 8px;
+}
+.pipeline-step .desc {
+  display: block;
+  color: #aaa;
+  font-size: 6.8px;
+  line-height: 1.9;
+}
+.map-route {
+  position: absolute;
+  z-index: -1;
+  border-color: rgba(102,170,255,.75);
+  filter: drop-shadow(0 0 8px rgba(102,170,255,.35));
+}
+.map-route.h {
+  height: 0;
+  border-top: 3px dashed rgba(102,170,255,.75);
+}
+.map-route.v {
+  width: 0;
+  border-left: 3px dashed rgba(102,170,255,.75);
+}
+.map-route.green { border-color: rgba(125,255,178,.72); }
+.r12 { left: 30%; top: 52px; width: 5%; }
+.r23 { left: 65%; top: 52px; width: 5%; }
+.r34 { right: 15%; top: 104px; height: 88px; }
+.r45 { left: 65%; top: 244px; width: 5%; }
+.r56 { left: 30%; top: 244px; width: 5%; }
+.r67 { left: 15%; top: 296px; height: 88px; }
+.r78 { left: 30%; top: 436px; width: 5%; }
+.r89 { left: 65%; top: 436px; width: 5%; }
+.result-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 20px;
+  line-height: 1.8;
+  margin-top: 14px;
+}
+.result-table th,
+.result-table td {
+  border: 1px solid #ccc8b4;
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+.result-table th {
+  color: var(--col);
+  background: rgba(0,0,0,.04);
+  font-weight: normal;
+}
+.result-table td.num { text-align: right; white-space: nowrap; }
+.result-table .good { color: #5db88a; }
+.result-table .warn { color: #c98844; }
+.slide-note {
+  margin-top: 12px;
+  color: #777;
+  font-size: 18px;
+  line-height: 1.8;
+}
+.prompt-example {
+  display: block;
+  margin-top: 16px;
+  color: #d8d8d8;
+  font-size: 13.2px;
+  line-height: 2.25;
+  white-space: pre-wrap;
+}
+.cursor {
+  display: inline-block;
+  width: 10px; height: 2px;
+  background: var(--col);
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: blink .7s step-start infinite;
+  flex: 0 0 auto;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* bottom nav */
+#bottom-nav {
+  position: relative; z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 40px 20px;
+  flex-shrink: 0;
+}
+.btn {
+  background: transparent;
+  color: var(--col);
+  border: 2px solid var(--col);
+  font-family: 'VT323', monospace;
+  font-size: 16px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  letter-spacing: .5px;
+}
+.btn:hover:not(:disabled) { background: var(--col); color: #000; }
+.btn:disabled { border-color: #ccc8b4; color: #bbb8a8; cursor: default; }
+
+#slide-counter {
+  font-size: 14px;
+  color: var(--dim);
+  flex: 1;
+  text-align: center;
+}
+
+/* decorative corner brackets on content-box */
+#content-box::before,
+#content-box::after {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  border-color: var(--col);
+  border-style: solid;
+  opacity: .4;
+  transition: border-color .3s;
+}
+#content-box::before { top: 18px; left: 28px; border-width: 2px 0 0 2px; }
+#content-box::after  { bottom: 14px; right: 28px; border-width: 0 2px 2px 0; }
+
+/* welcome screen */
+#welcome {
+  position: absolute; inset: 0; z-index: 5;
+  background: var(--sky);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+  text-align: center;
+  padding: 40px;
+}
+#welcome h1 { font-family: 'Press Start 2P', monospace; font-size: 30px; color: var(--gold); text-shadow: none; line-height: 1.65; }
+#welcome p  { font-size: 22px; color: #555; line-height: 2.0; max-width: 900px; }
+#welcome .hint { font-size: 18px; color: #999; animation: blink 1.5s step-start infinite; margin-top: 18px; }
+#welcome .authors { font-size: 18px; color: #888; line-height: 2.25; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── LEFT SIDEBAR ── -->
+  <div id="sidebar">
+    <canvas id="portrait-canvas" width="108" height="108"></canvas>
+    <div id="portrait-label">SELECT A CHAPTER</div>
+    <div id="nav-list"></div>
+    <div id="sidebar-footer">← → ARROWS · ESC BACK · F FULLSCREEN</div>
+  </div>
+
+  <!-- ── MAIN ── -->
+  <div id="main">
+    <div id="stars-bg"></div>
+
+    <!-- welcome screen shown on load -->
+    <div id="welcome">
+      <h1>⚔ THE RAG KINGDOM ⚔</h1>
+      <p>Adaptive Context Selection for Token-Efficient<br>Retrieval-Augmented Generation</p>
+      <div class="authors">
+        Andreia Alexa · Simon Backhaus Brudzewski · Karlis Martins Auce<br>
+        Joel Vazquez · Sheraz Ahmad
+      </div>
+      <div class="hint">▶ SELECT A CHAPTER FROM THE LEFT TO BEGIN ◀</div>
+      <button class="btn" id="btn-fullscreen" onclick="toggleFullscreen()" style="margin-top:8px;font-size:16px;padding:10px 22px;">⛶ ENTER FULLSCREEN [F]</button>
+    </div>
+
+    <div id="topbar">
+      <span class="title-main">⚔ THE RAG KINGDOM</span>
+      <span class="title-sub">Adaptive Context Selection for Token-Efficient RAG</span>
+    </div>
+
+    <div id="content-box">
+      <div id="section-title">—</div>
+      <div id="slide-text"></div>
+    </div>
+
+    <div id="bottom-nav">
+      <button class="btn" id="btn-prev" onclick="navigate(-1)" disabled>◄ PREV</button>
+      <span id="slide-counter">— / —</span>
+      <button class="btn" id="btn-next" onclick="navigate(1)" disabled>NEXT ►</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Pixel-art characters (24×24 grid, P=3 → 108×108 canvas) ──
+const P = 2;
+function r(ctx, x, y, w, h, c) {
+  ctx.fillStyle = c;
+  ctx.fillRect(x*P, y*P, w*P, h*P);
+}
+
+const CHARS = {
+  bard(ctx) {
+    r(ctx, 6,0, 12,1, '#aa1a1a');
+    r(ctx, 5,1, 14,3, '#cc2222');
+    r(ctx,18,0,  3,1, '#55cc33');
+    r(ctx,19,1,  2,2, '#44aa22');
+    r(ctx,20,2,  1,1, '#33881a');
+    r(ctx, 4,2,  3,2, '#7a3c0a');
+    r(ctx,17,2,  3,2, '#7a3c0a');
+    r(ctx, 4,4,  2,1, '#7a3c0a');
+    r(ctx,18,4,  2,1, '#7a3c0a');
+    r(ctx, 5,4, 14,6, '#f4c4a0');
+    r(ctx, 8,5,  2,2, '#4a2000');
+    r(ctx,14,5,  2,2, '#4a2000');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#d4a080');
+    r(ctx, 8,8,  2,1, '#cc5533');
+    r(ctx,14,8,  2,1, '#cc5533');
+    r(ctx,10,9,  4,1, '#cc5533');
+    r(ctx, 6,9,  2,1, '#e8b090');
+    r(ctx,16,9,  2,1, '#e8b090');
+    r(ctx, 2,10, 20,10, '#2d6a2d');
+    r(ctx,10,10,  4,2, '#f4c4a0');
+    r(ctx, 3,15, 18,2, '#c8a000');
+    r(ctx,10,15,  4,2, '#ffd700');
+    r(ctx,18,11,  5,6, '#a06030');
+    r(ctx,19,12,  3,4, '#c8904a');
+    r(ctx,20,10,  2,2, '#5a2000');
+    r(ctx, 5,20,  6,4, '#1a4a1a');
+    r(ctx,13,20,  6,4, '#1a4a1a');
+    r(ctx, 4,22,  7,2, '#3a1a00');
+    r(ctx,13,22,  7,2, '#3a1a00');
+  },
+  scholar(ctx) {
+    r(ctx, 7,0, 10,2, '#b0b0b0');
+    r(ctx, 5,1, 14,2, '#b0b0b0');
+    r(ctx, 4,2,  3,5, '#aaaaaa');
+    r(ctx,17,2,  3,5, '#aaaaaa');
+    r(ctx, 5,3, 14,7, '#e8b090');
+    r(ctx, 7,5,  4,2, '#888');
+    r(ctx,13,5,  4,2, '#888');
+    r(ctx, 8,5,  2,2, '#c8e8ff');
+    r(ctx,14,5,  2,2, '#c8e8ff');
+    r(ctx,11,5,  2,1, '#aaa');
+    r(ctx, 8,5,  2,1, '#2d2d2d');
+    r(ctx,14,5,  2,1, '#2d2d2d');
+    r(ctx,11,6,  2,2, '#d4a080');
+    r(ctx, 5,9, 14,2, '#c0c0c0');
+    r(ctx, 6,10, 12,2, '#d0d0d0');
+    r(ctx, 8,11,  8,1, '#d8d8d8');
+    r(ctx, 2,10, 20,13, '#1a2a6a');
+    r(ctx, 8,10,  8,2, '#c8a000');
+    r(ctx,11,10,  2,13, '#c8a000');
+    r(ctx,18,12,  5,5, '#8B5A1A');
+    r(ctx,18,12,  5,1, '#aa2222');
+    r(ctx,18,13,  5,3, '#f0e8d0');
+    r(ctx, 3,20, 18,3, '#131f52');
+    r(ctx, 5,22,  5,2, '#0a0a2a');
+    r(ctx,14,22,  5,2, '#0a0a2a');
+  },
+  alchemist(ctx) {
+    r(ctx, 4,0, 16,3, '#1e0e00');
+    r(ctx, 3,1,  3,3, '#2a1500');
+    r(ctx,18,1,  3,3, '#2a1500');
+    r(ctx, 5,2,  2,2, '#1e0e00');
+    r(ctx,17,2,  2,2, '#1e0e00');
+    r(ctx, 7,1,  4,2, '#3a7a3a');
+    r(ctx,13,1,  4,2, '#3a7a3a');
+    r(ctx, 9,1,  2,2, '#4a9a4a');
+    r(ctx,14,1,  2,2, '#4a9a4a');
+    r(ctx,11,2,  2,1, '#888');
+    r(ctx, 5,4, 14,6, '#f0c090');
+    r(ctx, 8,5,  2,2, '#2d7a00');
+    r(ctx,14,5,  2,2, '#2d7a00');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx, 9,9,  5,1, '#cc5533');
+    r(ctx,14,8,  2,1, '#cc5533');
+    r(ctx,16,6,  1,2, '#c09070');
+    r(ctx, 2,10, 20,12, '#8B5A1A');
+    r(ctx, 7,11, 10,8, '#e8e0c0');
+    r(ctx, 9,13,  2,2, '#4a9a3a');
+    r(ctx,14,15,  2,2, '#aa3300');
+    r(ctx,11,12,  1,1, '#3a3aaa');
+    r(ctx, 3,17, 18,2, '#3a1a00');
+    r(ctx,10,17,  4,2, '#c8a000');
+    r(ctx,19,12,  4,1, '#888');
+    r(ctx,20,13,  3,5, '#3a9a3a');
+    r(ctx,19,14,  5,3, '#4aaa4a');
+    r(ctx,20,17,  3,1, '#2a6a2a');
+    r(ctx, 5,20,  6,4, '#6a3a10');
+    r(ctx,13,20,  6,4, '#6a3a10');
+    r(ctx, 4,22,  7,2, '#2a1000');
+    r(ctx,13,22,  7,2, '#2a1000');
+  },
+  knight(ctx) {
+    r(ctx, 9,0,  6,1, '#4444cc');
+    r(ctx,10,1,  4,2, '#5555dd');
+    r(ctx,11,2,  2,1, '#6666ee');
+    r(ctx, 5,2, 14,2, '#c8c8c8');
+    r(ctx, 4,3, 16,5, '#d0d0d0');
+    r(ctx, 5,4, 14,4, '#c0c0c0');
+    r(ctx, 7,4, 10,2, '#1a1a2a');
+    r(ctx, 8,4,  3,1, '#4488ff');
+    r(ctx,13,4,  3,1, '#4488ff');
+    r(ctx, 7,7, 10,2, '#c8c8c8');
+    r(ctx, 9,8,  6,2, '#b8b8b8');
+    r(ctx, 2,10, 20,12, '#c0c0c0');
+    r(ctx, 2,10, 20,1, '#4444cc');
+    r(ctx,11,10,  2,12, '#4444cc');
+    r(ctx, 1,10,  4,4, '#d0d0d0');
+    r(ctx,19,10,  4,4, '#d0d0d0');
+    r(ctx, 0,10,  3,8, '#4444cc');
+    r(ctx, 0,12,  3,2, '#ffd700');
+    r(ctx, 1,10,  1,8, '#ffd700');
+    r(ctx,22,8,  2,14, '#c8c8c8');
+    r(ctx,21,10,  4,1, '#ffd700');
+    r(ctx, 5,22,  6,2, '#b0b0b0');
+    r(ctx,13,22,  6,2, '#b0b0b0');
+    r(ctx, 4,23,  8,1, '#c0c0c0');
+    r(ctx,12,23,  8,1, '#c0c0c0');
+  },
+  sorceress(ctx) {
+    r(ctx, 2,2,  4,20, '#d0d8f0');
+    r(ctx,18,2,  4,20, '#d0d8f0');
+    r(ctx, 3,2,  2,20, '#e0e8ff');
+    r(ctx,19,2,  2,18, '#e0e8ff');
+    r(ctx, 4,0, 16,3, '#d0d8f0');
+    r(ctx, 5,1, 14,3, '#e0e8ff');
+    r(ctx,10,0,  4,2, '#ffd700');
+    r(ctx,11,0,  2,1, '#ff88aa');
+    r(ctx, 5,3, 14,7, '#f4c4a0');
+    r(ctx, 8,5,  2,2, '#7733cc');
+    r(ctx,14,5,  2,2, '#7733cc');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#e0a888');
+    r(ctx, 9,8,  2,1, '#cc7766');
+    r(ctx,13,8,  2,1, '#cc7766');
+    r(ctx,11,9,  2,1, '#dd8877');
+    r(ctx, 4,10, 16,14, '#5b2d8e');
+    r(ctx, 3,12, 18,10, '#6535a0');
+    r(ctx, 8,10,  8,2, '#c8a000');
+    r(ctx, 9,10,  6,1, '#ffd700');
+    r(ctx, 6,14,  2,2, '#ffd700');
+    r(ctx,16,13,  2,2, '#ffd700');
+    r(ctx, 8,18,  2,2, '#ffd700');
+    r(ctx,14,17,  2,2, '#c8a000');
+    r(ctx, 1,6,  2,18, '#8b4513');
+    r(ctx, 0,5,  4,2, '#ffd700');
+    r(ctx, 1,4,  2,1, '#ff88ff');
+    r(ctx, 4,22, 16,2, '#7b3dbe');
+    r(ctx, 5,23, 14,1, '#c8a000');
+  },
+  ranger(ctx) {
+    r(ctx, 6,0, 12,3, '#2f7d32');
+    r(ctx, 4,2, 16,3, '#3f9d42');
+    r(ctx, 8,0,  8,1, '#66cc66');
+    r(ctx, 5,4, 14,6, '#d8a070');
+    r(ctx, 7,5,  3,2, '#2b1a00');
+    r(ctx,14,5,  3,2, '#2b1a00');
+    r(ctx, 8,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#b87850');
+    r(ctx, 9,9,  6,1, '#7a2a1a');
+    r(ctx, 3,10, 18,12, '#2e6b2e');
+    r(ctx, 5,12, 14,2, '#4a8f35');
+    r(ctx, 9,10,  6,3, '#d8a070');
+    r(ctx, 2,12,  3,8, '#8b5a2b');
+    r(ctx,19,11,  2,12, '#c48a3a');
+    r(ctx,20,10,  1,2, '#f4d060');
+    r(ctx,21,9,   1,1, '#f4d060');
+    r(ctx, 6,20,  5,4, '#1c4b1c');
+    r(ctx,13,20,  5,4, '#1c4b1c');
+    r(ctx, 5,23,  7,1, '#4b2a12');
+    r(ctx,13,23,  7,1, '#4b2a12');
+  },
+  cartographer(ctx) {
+    r(ctx, 5,1, 14,3, '#8b5a2b');
+    r(ctx, 4,3, 16,2, '#a66a2a');
+    r(ctx, 6,4, 12,6, '#e0b080');
+    r(ctx, 8,5,  2,2, '#1e1e1e');
+    r(ctx,14,5,  2,2, '#1e1e1e');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#c48a70');
+    r(ctx, 9,9,  6,1, '#7a3322');
+    r(ctx, 2,10, 20,13, '#244b7a');
+    r(ctx, 5,11, 14,9, '#e4d6a7');
+    r(ctx, 6,12, 12,1, '#a88f55');
+    r(ctx, 6,15, 12,1, '#a88f55');
+    r(ctx, 6,18, 12,1, '#a88f55');
+    r(ctx, 8,13,  2,2, '#44aa66');
+    r(ctx,14,16,  3,2, '#4488cc');
+    r(ctx,11,14,  1,5, '#cc8844');
+    r(ctx, 2,13,  4,3, '#244b7a');
+    r(ctx,18,12,  5,4, '#b8874d');
+    r(ctx, 6,22,  5,2, '#1b3152');
+    r(ctx,13,22,  5,2, '#1b3152');
+  },
+  oracle(ctx) {
+    r(ctx, 4,0, 16,4, '#202060');
+    r(ctx, 6,1, 12,3, '#303090');
+    r(ctx,10,0,  4,2, '#ffd700');
+    r(ctx, 5,4, 14,6, '#f0c098');
+    r(ctx, 7,5,  4,2, '#222255');
+    r(ctx,13,5,  4,2, '#222255');
+    r(ctx, 8,5,  2,2, '#b8ffff');
+    r(ctx,14,5,  2,2, '#b8ffff');
+    r(ctx,11,7,  2,1, '#d8a078');
+    r(ctx, 9,9,  6,1, '#aa5566');
+    r(ctx, 3,10, 18,14, '#2430a0');
+    r(ctx, 5,12, 14,9, '#3038c0');
+    r(ctx,11,10,  2,13, '#ffd700');
+    r(ctx, 7,13,  2,2, '#ffd700');
+    r(ctx,16,15,  2,2, '#ffd700');
+    r(ctx, 9,18,  6,2, '#151550');
+    r(ctx, 1,6,   2,17, '#6b3fb0');
+    r(ctx, 0,5,   4,2, '#b8ffff');
+    r(ctx, 1,4,   2,1, '#ffffff');
+  },
+  engineer(ctx) {
+    r(ctx, 5,0, 14,4, '#6a6a6a');
+    r(ctx, 4,2, 16,2, '#888888');
+    r(ctx, 7,1,  3,2, '#ffcc33');
+    r(ctx,14,1,  3,2, '#ffcc33');
+    r(ctx, 5,4, 14,6, '#d89a72');
+    r(ctx, 7,5,  4,2, '#333333');
+    r(ctx,13,5,  4,2, '#333333');
+    r(ctx, 8,5,  2,2, '#99ddff');
+    r(ctx,14,5,  2,2, '#99ddff');
+    r(ctx,11,7,  2,1, '#b87850');
+    r(ctx, 9,9,  6,1, '#7a2a1a');
+    r(ctx, 2,10, 20,12, '#5b5b5b');
+    r(ctx, 4,12, 16,7, '#777777');
+    r(ctx, 7,13,  3,3, '#ffcc33');
+    r(ctx,14,13,  3,3, '#ffcc33');
+    r(ctx,11,10,  2,12, '#ffcc33');
+    r(ctx,20,11,  3,8, '#9a5a2a');
+    r(ctx,21,10,  2,2, '#c0c0c0');
+    r(ctx, 6,21,  5,3, '#3a3a3a');
+    r(ctx,13,21,  5,3, '#3a3a3a');
+  },
+  cleric(ctx) {
+    r(ctx, 7,0, 10,2, '#f2e8c8');
+    r(ctx, 6,2, 12,3, '#e8d8a8');
+    r(ctx, 5,4, 14,6, '#f0c090');
+    r(ctx, 8,5,  2,2, '#3a2a1a');
+    r(ctx,14,5,  2,2, '#3a2a1a');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#c09070');
+    r(ctx, 9,9,  6,1, '#9a4a40');
+    r(ctx, 3,10, 18,14, '#f0e8c8');
+    r(ctx, 5,11, 14,11, '#fff2d0');
+    r(ctx,11,10,  2,13, '#c8a000');
+    r(ctx, 8,14,  8,2, '#c8a000');
+    r(ctx, 2,12,  3,6, '#f0e8c8');
+    r(ctx,19,12,  3,6, '#f0e8c8');
+    r(ctx, 0,10,  2,13, '#8b6b2b');
+    r(ctx, 0,9,   3,2, '#ffd700');
+    r(ctx, 6,22,  5,2, '#d0c090');
+    r(ctx,13,22,  5,2, '#d0c090');
+  },
+  merchant(ctx) {
+    r(ctx, 5,0, 14,3, '#7a1a5a');
+    r(ctx, 4,2, 16,3, '#9a2a7a');
+    r(ctx, 8,1,  8,1, '#ffd700');
+    r(ctx, 5,4, 14,6, '#e0a878');
+    r(ctx, 8,5,  2,2, '#2a1600');
+    r(ctx,14,5,  2,2, '#2a1600');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#c08868');
+    r(ctx, 8,9,  8,1, '#7a2a1a');
+    r(ctx, 2,10, 20,12, '#7a1a5a');
+    r(ctx, 5,12, 14,4, '#9a2a7a');
+    r(ctx, 6,16, 12,3, '#ffd700');
+    r(ctx, 9,16,  2,3, '#fff0a0');
+    r(ctx,14,16,  2,3, '#fff0a0');
+    r(ctx,19,12,  4,6, '#8b5a2b');
+    r(ctx,20,13,  2,4, '#c09050');
+    r(ctx, 6,21,  5,3, '#4a1038');
+    r(ctx,13,21,  5,3, '#4a1038');
+  },
+  scribe(ctx) {
+    r(ctx, 6,0, 12,2, '#4a2a10');
+    r(ctx, 5,2, 14,3, '#6a3a18');
+    r(ctx, 4,4, 16,3, '#7a4a20');
+    r(ctx, 5,4, 14,6, '#e8b080');
+    r(ctx, 7,5,  4,2, '#303030');
+    r(ctx,13,5,  4,2, '#303030');
+    r(ctx, 8,5,  2,2, '#d8f0ff');
+    r(ctx,14,5,  2,2, '#d8f0ff');
+    r(ctx,11,7,  2,1, '#c08868');
+    r(ctx, 9,9,  6,1, '#8a3a2a');
+    r(ctx, 2,10, 20,13, '#5a3a20');
+    r(ctx, 5,11, 14,9, '#f0e0b0');
+    r(ctx, 6,12, 12,1, '#9a7a40');
+    r(ctx, 6,14, 10,1, '#9a7a40');
+    r(ctx, 6,16, 12,1, '#9a7a40');
+    r(ctx, 6,18,  8,1, '#9a7a40');
+    r(ctx,19,11,  4,2, '#d0d0d0');
+    r(ctx,20,13,  2,7, '#f8f8f8');
+    r(ctx, 6,22,  5,2, '#3a2412');
+    r(ctx,13,22,  5,2, '#3a2412');
+  },
+  captain(ctx) {
+    r(ctx, 5,0, 14,3, '#1f3f8f');
+    r(ctx, 4,2, 16,2, '#2f5fbf');
+    r(ctx,10,0,  4,2, '#ffd700');
+    r(ctx, 5,4, 14,6, '#e0a878');
+    r(ctx, 8,5,  2,2, '#1a1a1a');
+    r(ctx,14,5,  2,2, '#1a1a1a');
+    r(ctx, 9,5,  1,1, '#fff');
+    r(ctx,15,5,  1,1, '#fff');
+    r(ctx,11,7,  2,1, '#c08868');
+    r(ctx, 8,9,  8,1, '#7a2a1a');
+    r(ctx, 2,10, 20,12, '#1f3f8f');
+    r(ctx, 4,12, 16,3, '#2f5fbf');
+    r(ctx,11,10,  2,12, '#ffd700');
+    r(ctx, 8,14,  8,2, '#ffd700');
+    r(ctx,20,10,  3,10, '#c8c8c8');
+    r(ctx,21,9,   2,2, '#ff6666');
+    r(ctx, 6,21,  5,3, '#102452');
+    r(ctx,13,21,  5,3, '#102452');
+  }
+};
+
+function drawCharacter(type) {
+  const canvas = document.getElementById('portrait-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 108, 108);
+  ctx.fillStyle = '#111133';
+  ctx.fillRect(0, 0, 108, 108);
+  ctx.save();
+  ctx.translate(30, 30);
+  CHARS[type]?.(ctx);
+  ctx.restore();
+}
+
+function drawIdle() {
+  const canvas = document.getElementById('portrait-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 108, 108);
+  ctx.fillStyle = '#07071a';
+  ctx.fillRect(0, 0, 108, 108);
+  // question mark silhouette
+  ctx.fillStyle = '#2a2a4a';
+  ctx.font = 'bold 52px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('?', 54, 54);
+}
+
+// ── Section data ──────────────────────────────────────────────
+const SECTIONS = [
+  {
+    id: 'introduction',
+    nav: '1 · INTRODUCTION',
+    name: 'ALDRIC THE HERALD',
+    title: '1 · INTRODUCTION',
+    char: 'bard',
+    color: '#a07828',
+    slides: [{ html: `<span class="kicker">THE PROBLEM WITH FIXED TOP-K RAG</span>
+      <ul>
+        <li>A simple factual question may need one sentence. A multi-hop question may need evidence across several documents.</li>
+        <li>But most RAG systems send the same top-k documents for every query regardless of complexity.</li>
+        <li>Fixed top-k wastes prompt tokens, increases latency, and exposes the model to distracting context.</li>
+        <li>More context is not automatically better — irrelevant context can actively hurt LLM performance, especially in smaller models.</li>
+      </ul>
+      <span class="kicker">RESEARCH QUESTION</span>
+      <ul>
+        <li>If the retrieved candidate set stays the same, can a RAG system decide how much evidence to send, and in what form?</li>
+        <li>We keep retrieval and context selection separate — every method uses the same top-10 documents.</li>
+        <li>The only variable is how those documents are converted into prompt context.</li>
+      </ul>` }]
+  },
+  {
+    id: 'related',
+    nav: '2 · RELATED WORK',
+    name: 'ORYN THE SCHOLAR',
+    title: '2 · RELATED WORK',
+    char: 'scholar',
+    color: '#a07828',
+    slides: [{ html: `<span class="kicker">ADAPTIVE RETRIEVAL</span>
+      <ul>
+        <li>FLARE retrieves iteratively only when the model expresses low confidence. Self-RAG uses learned reflection tokens to decide when to retrieve. Both require fine-tuning the generator — our method does not.</li>
+        <li>Our method predicts context budget from retrieval-score features only, before any LLM call.</li>
+      </ul>
+      <span class="kicker">PROMPT COMPRESSION</span>
+      <ul>
+        <li>LLMLingua and Selective Context compress prompts using a second language model. RECOMP trains a summarisation model.</li>
+        <li>Our n-gram neighbour selection is retrieval-side compression with no extra model calls.</li>
+      </ul>
+      <span class="kicker">CONTEXT RELEVANCE</span>
+      <ul>
+        <li>Shi et al. (2023) show that irrelevant context actively degrades LLM output — especially in smaller models.</li>
+        <li>We operationalise this finding: instead of compressing after retrieval, we limit what enters the prompt in the first place.</li>
+      </ul>` }]
+  },
+  {
+    id: 'approach',
+    nav: '3 · APPROACH',
+    name: 'THALRIC THE ALCHEMIST',
+    title: '3 · SAFE ADAPTIVE CONTEXT',
+    char: 'alchemist',
+    color: '#a07828',
+    slides: [{ html: `<span class="big-line">Send focused evidence first.<br>Expand only if the answer looks risky.</span>
+      <ul>
+        <li>Stage 1 — Predict a compact document budget from retrieval-score features, compress evidence, generate answer.</li>
+        <li>Stage 2 — Check answer quality: empty, uncertain phrasing, or low grounding triggers expansion.</li>
+        <li>Stage 3 — If flagged: re-run with full top-10 uncompressed context.</li>
+        <li>Easy queries stay cheap. Hard queries get more context. 0–5% of queries reach Stage 3.</li>
+      </ul>
+      <span class="kicker">CONTRIBUTIONS</span>
+      <ul>
+        <li>A task-aware context controller requiring no fine-tuning and no extra model calls.</li>
+        <li>Evaluation across SciFact, HotpotQA, and BioASQ at two model scales.</li>
+        <li>Ablation confirming each component's independent contribution.</li>
+      </ul>` }]
+  },
+  {
+    id: 'budget',
+    nav: '4 · BUDGET PREDICTION',
+    name: 'ORYN THE SCHOLAR',
+    title: '4 · BUDGET PREDICTION',
+    char: 'scholar',
+    color: '#a07828',
+    slides: [{ html: `<ul>
+        <li>All methods share the same top-10 TF-IDF candidate list — the budget controller is fully decoupled from retrieval.</li>
+        <li>Safe Adaptive predicts a document budget k ∈ {3, 5, 8, 10} before any LLM call.</li>
+        <li>Features: query length, lexical diversity, top scores, score gaps, score ratios, score mass, entropy, normalised entropy.</li>
+      </ul>
+      <span class="kicker">DECISION LOGIC</span>
+      <ul>
+        <li>Sharp score drop after top docs → evidence is concentrated → use 3 or 5 docs.</li>
+        <li>Flat, even scores → evidence is spread out → use 8 or 10 docs.</li>
+        <li>Nearest-centroid classifier. No labelled training data. Adds microseconds of latency per query.</li>
+      </ul>` }]
+  },
+  {
+    id: 'compression',
+    nav: '5 · EVIDENCE COMPRESSION',
+    name: 'MIRA THE RANGER',
+    title: '5 · EVIDENCE COMPRESSION',
+    char: 'ranger',
+    color: '#a07828',
+    slides: [{ html: `<ul>
+        <li>Each selected document is split into sentences.</li>
+        <li>Sentences scored by: lexical overlap, rare query-term matches, phrase overlap, token density, position bonus.</li>
+        <li>The best sentence and its neighbours are retained — evidence stays short but coherent.</li>
+        <li>For concise QA tasks, broader sentence-level packing is used to avoid dropping exact short-answer strings.</li>
+      </ul>
+      <span class="kicker">WHY THIS MATTERS</span>
+      <ul>
+        <li>The LLM sees focused evidence, not a wall of text.</li>
+        <li>No second model needed — scoring is purely lexical.</li>
+        <li>Neighbours preserved so the extracted evidence remains interpretable.</li>
+      </ul>` }]
+  },
+  {
+    id: 'fallback',
+    nav: '6 · SAFETY FALLBACK',
+    name: 'LYARA THE SORCERESS',
+    title: '6 · SAFETY FALLBACK',
+    char: 'sorceress',
+    color: '#a07828',
+    slides: [{ html: `<ul>
+        <li>Generate an answer with compact context first.</li>
+        <li>If the answer looks risky, expand: fuller evidence → larger budget → full top-10.</li>
+        <li>If not risky, return immediately — no extra LLM call.</li>
+      </ul>
+      <span class="kicker">FALLBACK TRIGGER CONDITIONS</span>
+      <ul>
+        <li>Answer is empty or fewer than 4 tokens.</li>
+        <li>Uncertain phrasing detected: "insufficient evidence", "unclear", similar phrases.</li>
+        <li>Fewer than 15% of non-stopword answer tokens grounded in the evidence.</li>
+        <li>Total cost: Stage 1 only, or Stage 1 + Stage 3 if fallback fires. 0–5% of queries reach it.</li>
+      </ul>` }]
+  },
+  {
+    id: 'setup',
+    nav: '7 · EXPERIMENTAL SETUP',
+    name: 'NOMA THE CARTOGRAPHER',
+    title: '7 · EXPERIMENTAL SETUP',
+    char: 'cartographer',
+    color: '#a07828',
+    slides: [{ html: `<table class="result-table">
+        <tr><th>Dataset</th><th>Task type</th><th>Evaluation role</th></tr>
+        <tr><td>SciFact</td><td>Biomedical claim verification</td><td>Focused evidence setting</td></tr>
+        <tr><td>HotpotQA</td><td>Multi-hop general QA</td><td>Broader evidence setting</td></tr>
+        <tr><td>BioASQ</td><td>Biomedical factoid QA</td><td>Short biomedical answer setting</td></tr>
+      </table>
+      <ul>
+        <li>150 queries per dataset: 50 dev for calibration, 100 held-out for final evaluation.</li>
+        <li>Mistral 7B: local via Ollama. Llama-3.3-70B-Instruct: hosted API. Both at temperature 0.</li>
+        <li>Token counts from provider API only — actual billing units, not local estimates.</li>
+        <li>7 methods compared: No Retrieval, Fixed Top-3/5/7/10, Heuristic Rules, Safe Adaptive Context.</li>
+      </ul>` }]
+  },
+  {
+    id: 'results',
+    nav: '8 · RESULTS',
+    name: 'VALE THE CAPTAIN',
+    title: '8 · MAIN RESULTS',
+    char: 'captain',
+    color: '#a07828',
+    slides: [{ html: `<span class="kicker">SAFE ADAPTIVE VS FIXED TOP-10</span>
+      <table class="result-table">
+        <tr><th>Dataset</th><th>Model</th><th>Fixed F1</th><th>Safe F1</th><th>Fixed Tokens</th><th>Safe Tokens</th><th>Reduction</th></tr>
+        <tr><td>SciFact</td><td>Mistral</td><td class="num">0.204</td><td class="num good">0.253</td><td class="num">3,781</td><td class="num">985</td><td class="num good">73.9%</td></tr>
+        <tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.262</td><td class="num good">0.265</td><td class="num">3,412</td><td class="num">933</td><td class="num good">72.6%</td></tr>
+        <tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.516</td><td class="num good">0.540</td><td class="num">1,762</td><td class="num">1,240</td><td class="num good">29.6%</td></tr>
+        <tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.765</td><td class="num warn">0.737</td><td class="num">1,537</td><td class="num">1,066</td><td class="num good">30.6%</td></tr>
+        <tr><td>BioASQ</td><td>Mistral</td><td class="num">0.257</td><td class="num good">0.339</td><td class="num">3,889</td><td class="num">2,011</td><td class="num good">48.3%</td></tr>
+        <tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">3,496</td><td class="num">1,668</td><td class="num good">52.3%</td></tr>
+      </table>
+      <ul>
+        <li>Token savings in every setting — 29–74% across all 6 dataset–model combinations.</li>
+        <li>F1 preserved or improved in 5 of 6 settings. Only HotpotQA / Llama-70B drops slightly, retaining 96.3% of Fixed Top-10 F1.</li>
+      </ul>` }]
+  },
+  {
+    id: 'analysis',
+    nav: '9 · ANALYSIS',
+    name: 'LYARA THE ORACLE',
+    title: '9 · ANALYSIS',
+    char: 'oracle',
+    color: '#a07828',
+    slides: [{ html: `<table class="result-table">
+        <tr><th>Dataset</th><th>Avg. Token Reduction</th><th>Avg. F1 Retention</th><th>Interpretation</th></tr>
+        <tr><td>SciFact</td><td class="num good">73.3%</td><td class="num good">112.7%</td><td>Compact evidence is often enough for claim verification</td></tr>
+        <tr><td>HotpotQA</td><td class="num warn">30.1%</td><td class="num">100.4%</td><td>Multi-hop questions need linked evidence across documents</td></tr>
+        <tr><td>BioASQ</td><td class="num good">50.3%</td><td class="num good">115.7%</td><td>Biomedical factoids benefit from focused evidence</td></tr>
+      </table>
+      <ul>
+        <li>Token savings track task structure — the system adapts to what each task needs.</li>
+        <li>Smaller models are more sensitive to noisy long prompts — Fixed Top-10 is the worst method for Mistral on 2 of 3 datasets.</li>
+        <li>For Mistral on SciFact and BioASQ, compressed contexts improve F1 by removing distracting passages.</li>
+        <li>Better retrieval amplifies the budget controller: cross-encoder reranking on BioASQ increases savings from 52.3% to 76.7%.</li>
+      </ul>` }]
+  },
+  {
+    id: 'ablation',
+    nav: '10 · ABLATION',
+    name: 'GARRON THE ENGINEER',
+    title: '10 · ABLATION STUDY',
+    char: 'engineer',
+    color: '#a07828',
+    slides: [{ html: `<span class="kicker">COMPONENT ABLATION — SCIFACT + LLAMA-70B</span>
+      <table class="result-table">
+        <tr><th>Variant</th><th>F1</th><th>Tokens</th><th>Reduction</th><th>Fallback</th></tr>
+        <tr><td>Fixed Top-10</td><td class="num">0.247</td><td class="num">3,325</td><td class="num">0.0%</td><td class="num">0.0%</td></tr>
+        <tr><td>Adaptive Compact Only</td><td class="num good">0.248</td><td class="num">736</td><td class="num good">77.9%</td><td class="num">0.0%</td></tr>
+        <tr><td>Adaptive Full Only</td><td class="num">0.240</td><td class="num">1,097</td><td class="num good">67.0%</td><td class="num">0.0%</td></tr>
+        <tr><td>Full Safe Adaptive</td><td class="num">0.247</td><td class="num">780</td><td class="num good">76.5%</td><td class="num">4.0%</td></tr>
+      </table>
+      <ul>
+        <li>Compact evidence is not a lossy shortcut — Adaptive Compact Only matches Fixed Top-10 F1 at 77.9% fewer tokens.</li>
+        <li>Each component contributes independently and additively.</li>
+        <li>The fallback adds negligible average cost but prevents failures on the hardest queries.</li>
+      </ul>` }]
+  },
+  {
+    id: 'annotation',
+    nav: '11 · HUMAN EVALUATION',
+    name: 'PENNA THE SCRIBE',
+    title: '11 · HUMAN EVALUATION',
+    char: 'scribe',
+    color: '#a07828',
+    slides: [{ html: `<ul>
+        <li>Token F1 can penalise correct paraphrases; semantic similarity can over-credit related but wrong answers.</li>
+        <li>Human annotation provides a factual correctness check that automatic metrics cannot.</li>
+      </ul>
+      <table class="result-table">
+        <tr><th>Item</th><th>Design</th></tr>
+        <tr><td>Sample size</td><td>120 Safe Adaptive outputs</td></tr>
+        <tr><td>Datasets</td><td>40 SciFact, 40 HotpotQA, 40 BioASQ</td></tr>
+        <tr><td>Annotators</td><td>Two independent annotators</td></tr>
+        <tr><td>Shown fields</td><td>Query, reference answer, model answer, retrieved evidence</td></tr>
+        <tr><td>Agreement</td><td>Cohen kappa and disagreement list for adjudication</td></tr>
+      </table>
+      <span class="kicker">EXPECTED PATTERNS</span>
+      <ul>
+        <li>SciFact: more NOT_ENOUGH_INFO — compact selection may miss evidence lower in the ranking.</li>
+        <li>HotpotQA: higher CORRECT rate — high F1 retention and zero fallback rate.</li>
+        <li>BioASQ: more PARTIALLY_CORRECT — model answers often elaborate beyond concise reference phrases.</li>
+      </ul>` }]
+  },
+  {
+    id: 'conclusion',
+    nav: '12 · CONCLUSION',
+    name: 'CAIUS THE KNIGHT',
+    title: '12 · CONCLUSION',
+    char: 'knight',
+    color: '#a07828',
+    slides: [{ html: `<span class="big-line">How much evidence is enough?</span>
+      <ul>
+        <li>29.6–73.9% token savings across all 6 dataset–model combinations.</li>
+        <li>At least 96.3% of Fixed Top-10 F1 retained in every setting.</li>
+        <li>Adaptive budgeting and lexical compression are the main efficiency drivers.</li>
+        <li>No fine-tuning, no extra model calls, no external labels — deploys on any retriever and generator.</li>
+      </ul>
+      <span class="kicker">FUTURE WORK</span>
+      <ul>
+        <li>Evaluate with dense retrieval to improve gold-document coverage at small budgets.</li>
+        <li>Calibrate fallback thresholds using human annotation labels.</li>
+        <li>Test budget predictor generalisation to out-of-domain settings.</li>
+      </ul>` }]
+  }
+];
+
+
+
+// ── State ─────────────────────────────────────────────────────
+let currentIdx = -1, slide = 0;
+
+// ── Build stars ───────────────────────────────────────────────
+function buildStars() {
+  const bg = document.getElementById('stars-bg');
+  for (let i = 0; i < 80; i++) {
+    const s = document.createElement('div'); s.className = 'star';
+    const sz = Math.random() * 2 + 0.5;
+    s.style.cssText = `left:${Math.random()*100}%;top:${Math.random()*100}%;
+      width:${sz}px;height:${sz}px;
+      --dur:${(Math.random()*4+2).toFixed(1)}s;
+      --del:-${(Math.random()*4).toFixed(1)}s;`;
+    bg.appendChild(s);
+  }
+}
+
+// ── Build nav list ────────────────────────────────────────────
+function buildNav() {
+  const list = document.getElementById('nav-list');
+  SECTIONS.forEach((sec, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-item';
+    btn.dataset.idx = i;
+    btn.textContent = sec.nav;
+    btn.style.setProperty('--col', sec.color);
+    btn.addEventListener('click', () => openSection(i));
+    list.appendChild(btn);
+  });
+}
+
+// ── Open section ──────────────────────────────────────────────
+function openSection(idx) {
+  currentIdx = idx; slide = 0;
+  document.getElementById('welcome').style.display = 'none';
+  document.querySelectorAll('.nav-item').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+    b.style.setProperty('--col', SECTIONS[i].color);
+  });
+  applyColor(SECTIONS[idx].color);
+  render();
+}
+
+function applyColor(_col) { /* single consistent color from CSS */ }
+
+function navigate(dir) {
+  const next = Math.max(0, Math.min(SECTIONS.length - 1, currentIdx + dir));
+  if (next !== currentIdx) openSection(next);
+}
+
+function render() {
+  const sec = SECTIONS[currentIdx];
+  drawCharacter(sec.char);
+  document.getElementById('portrait-label').textContent = sec.name;
+  document.getElementById('section-title').textContent = sec.title;
+  document.getElementById('btn-prev').disabled = currentIdx <= 0;
+  document.getElementById('btn-next').disabled = currentIdx >= SECTIONS.length - 1;
+  document.getElementById('slide-counter').textContent = `${currentIdx + 1} / ${SECTIONS.length}`;
+
+  const html = sec.slides.map(item => {
+    if (typeof item === 'string') return `<p class="slide-para">${item}</p>`;
+    if (item.html) return `<div class="slide-block">${item.html}</div>`;
+    return '';
+  }).join('');
+  showHtml(html);
+  document.getElementById('slide-text').scrollTop = 0;
+}
+
+function showHtml(html) {
+  const el = document.getElementById('slide-text');
+  el.innerHTML = `<div class="slide-inner">${html}</div>`;
+}
+
+function typewrite(text) {
+  const el = document.getElementById('slide-text');
+  el.innerHTML = `<div class="slide-inner">${text}</div>`;
+}
+
+// ── Fullscreen ────────────────────────────────────────────────
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('btn-fullscreen');
+  if (btn) btn.textContent = document.fullscreenElement ? '⛶ EXIT FULLSCREEN [F]' : '⛶ ENTER FULLSCREEN [F]';
+});
+
+// ── Init ──────────────────────────────────────────────────────
+buildStars();
+buildNav();
+drawIdle();
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navigate(-1);
+  if (e.key === 'Escape' && currentIdx >= 0) {
+    currentIdx = -1;
+    document.getElementById('welcome').style.display = 'flex';
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.getElementById('portrait-label').textContent = 'SELECT A CHAPTER';
+    document.getElementById('section-title').textContent = '—';
+    document.getElementById('slide-text').textContent = '';
+    document.getElementById('slide-counter').textContent = '— / —';
+    document.getElementById('btn-prev').disabled = true;
+    document.getElementById('btn-next').disabled = true;
+    drawIdle();
+    applyColor('#ffd700');
+  }
+});
+</script>
+</body>
+</html>
