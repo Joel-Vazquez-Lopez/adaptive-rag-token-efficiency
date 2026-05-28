@@ -862,105 +862,6 @@ function drawIdle() {
 }
 
 // ── Section data ──────────────────────────────────────────────
-const OLD_SECTIONS = [
-  {
-    id: 'overview',
-    nav: '📜 THE QUEST',
-    name: 'ALDRIC THE HERALD', title: 'THE QUEST — OVERVIEW',
-    char: 'bard', color: '#ffd700',
-    slides: [
-      'Standard RAG pipelines retrieve the same 10 documents for every query and pass them all to the LLM. A query answered by one sentence pays the same token cost as a complex multi-hop task — wasteful and often harmful.',
-      'Safe Adaptive Context is a 3-stage pipeline: (1) predict a compact evidence budget per query using retrieval-score features, (2) compress each document to its most relevant sentences, (3) expand to full context only if the first answer is flagged as weak.',
-      'We evaluate 7 systems across 3 BEIR datasets — SciFact (claim verification), HotpotQA (multi-hop QA), BioASQ (biomedical factoid) — and 2 models: Mistral 7B (local, Ollama) and Llama-3.3-70B (hosted API).',
-      'Main result: 29–74% token reduction across all 6 dataset–model combinations. Answer quality is retained or improved in every case. Fallback triggers on only 0–5% of queries.'
-    ]
-  },
-  {
-    id: 'library',
-    nav: '📚 RELATED WORK',
-    name: 'ORYN THE SCHOLAR', title: 'RELATED WORK — THE ARCHIVES',
-    char: 'scholar', color: '#66aaff',
-    slides: [
-      'FLARE generates iteratively and retrieves only when the model expresses low confidence. Self-RAG uses learned reflection tokens to decide when to retrieve. Both require fine-tuning the generator — our method does not.',
-      'LLMLingua and Selective Context compress prompts using a second LM. RECOMP trains a summarisation model. Our n-gram neighbor selection is retrieval-side compression with no extra model calls.',
-      'Shi et al. (2023) show that irrelevant context actively degrades LLM output — especially in smaller models. We operationalise this: instead of compressing after retrieval, we limit what is transmitted to the generator in the first place.',
-      'Our method uses only retrieval-score features (score gaps, entropy, score mass) to predict query difficulty. No labeled training data. No fine-tuning. Adds microseconds of latency per query.'
-    ]
-  },
-  {
-    id: 'forge',
-    nav: '⚗️ THE SYSTEM',
-    name: 'THALRIC THE ALCHEMIST', title: 'SYSTEM — HOW IT WORKS',
-    char: 'alchemist', color: '#ff9944',
-    slides: [
-      'All methods share the same top-10 TF-IDF candidates. The retriever and the budget controller are fully decoupled — this isolates context selection as the single variable under study.',
-      'STAGE 1 — Budget prediction: a nearest-centroid classifier uses 6 retrieval-score features (top-1 score, score gaps, entropy, score concentration, query length) to select k ∈ {3, 5, 8} documents. Each document is trimmed to its highest-relevance sentence plus two neighbors.',
-      'STAGE 2 — Quality check (no gold labels): phrase triggers ("insufficient evidence", "unclear"), answer shorter than 4 tokens, or fewer than 15% of non-stopword answer tokens grounded in the evidence.',
-      'STAGE 3 — If flagged weak: re-query the LLM with full top-10 uncompressed context. If not flagged: return Stage 1 answer directly. Total cost = Stage 1 only, or Stage 1 + Stage 3 if fallback fires.'
-    ]
-  },
-  {
-    id: 'grounds',
-    nav: '⚔️ SETUP',
-    name: 'CAIUS THE KNIGHT', title: 'EXPERIMENTAL SETUP',
-    char: 'knight', color: '#44cc88',
-    slides: [
-      '3 BEIR benchmark datasets: SciFact (100 claim-verification queries), HotpotQA (100 multi-hop QA queries), BioASQ (100 biomedical factoid queries). 50-query dev split per dataset for calibration — never mixed with eval.',
-      'Mistral 7B runs locally via Ollama at temperature 0, max 80 completion tokens. Llama-3.3-70B-Instruct runs via hosted API with identical settings. Both accessed through an OpenAI-compatible interface.',
-      'Token counts are taken from provider API response fields only. Any run where the provider fails to return token usage is rejected. This ensures comparisons use actual billing units — not local estimates.',
-      '7 methods compared: No Retrieval, Fixed Top-3/5/7/10 (full documents), Heuristic Rules (score-gap thresholds), Safe Adaptive Context (main system). All share the same retrieved candidate set.'
-    ]
-  },
-  {
-    id: 'results',
-    nav: '📊 RESULTS',
-    name: 'CAIUS THE KNIGHT', title: 'MAIN RESULTS',
-    char: 'knight', color: '#ff7799',
-    slides: [
-      'SCIFACT: Safe Adaptive cuts tokens by 73.9% (Mistral) and 72.6% (Llama-70B). Answer F1 stays within 0.013 of Fixed Top-10. Fallback triggers on just 5% of queries. Fixed Top-10 is actually the worst method for Mistral (F1 = 0.204 vs 0.268 for Fixed Top-3).',
-      'HOTPOTQA: 29.6–30.6% token reduction. Safe Adaptive F1 with Mistral = 0.540, higher than Fixed Top-10\'s 0.516. Zero fallbacks triggered across both models — the system consistently produces adequate answers on the first pass.',
-      'BIOASQ: 48.3–52.3% token reduction. Safe Adaptive achieves the highest F1 of any method (Mistral: 0.339 vs Fixed Top-10: 0.257). As on SciFact, Fixed Top-10 is the worst method for Mistral due to context overload.',
-      'Key pattern: Fixed Top-10 hurts Mistral on 2 of 3 datasets but not Llama-70B. Larger models tolerate noisy prompts; 7B-scale models do not. Compact, targeted evidence helps smaller models most.'
-    ]
-  },
-  {
-    id: 'ablation',
-    nav: '🔬 ABLATION',
-    name: 'ORYN THE SCHOLAR', title: 'ABLATION STUDY',
-    char: 'scholar', color: '#bb66ff',
-    slides: [
-      'Adaptive budget predictor alone (no compression, no fallback) on SciFact / Llama-70B: 77.9% token reduction, 100.2% F1 retained vs Fixed Top-10. Already matches or exceeds quality at one-fifth of the token cost.',
-      'Adding n-gram neighbor compression: a further 10+ percentage points of reduction with F1 unchanged. Compact evidence keeps the LLM focused on relevant content rather than spreading attention across 10 full documents.',
-      'Safety fallback: only 4% of queries trigger it on SciFact. The fallback adds negligible average cost but prevents empty or incoherent answers on the hardest queries — the ones where a compact first pass genuinely fails.',
-      'Stacking effect (SciFact, Llama-70B): budget predictor alone = 67–78% reduction; adding compression = +10 pp; full Safe Adaptive = 73%. Each component contributes independently and additively.'
-    ]
-  },
-  {
-    id: 'oracle',
-    nav: '🔮 DISCUSSION',
-    name: 'LYARA THE SORCERESS', title: 'DISCUSSION',
-    char: 'sorceress', color: '#44dddd',
-    slides: [
-      'Token savings track evidence concentration by task. SciFact (1–2 key sentences per claim) saves 73–74%. HotpotQA (requires both supporting documents for multi-hop reasoning) saves only ~30%. BioASQ (short abstracts, high relevance) falls in between at 48–52%.',
-      'Smaller models degrade with noisy long prompts. On SciFact, Mistral Fixed Top-10 F1 is 24% lower than Fixed Top-3. On BioASQ, 26% lower than Fixed Top-5. Compact evidence partially fixes this — Safe Adaptive F1 exceeds Fixed Top-10 in 3 of 4 Mistral conditions.',
-      'Cross-encoder re-ranking improves nDCG@10 for Safe Adaptive on SciFact (0.560 → 0.624) without changing F1 or token efficiency. On BioASQ, sharper score distributions enable even larger savings (76.7% vs 52.3%). A better retriever amplifies the budget controller.',
-      'Key limitation: the budget predictor relies on TF-IDF score distributions as a proxy for query difficulty. When the gold document ranks low in retrieval, the predictor may commit to too small a budget. Fallback thresholds were set by inspection and may not transfer to new domains.'
-    ]
-  },
-  {
-    id: 'hall',
-    nav: '🏆 CONCLUSION',
-    name: 'ALDRIC THE HERALD', title: 'CONCLUSION & FUTURE WORK',
-    char: 'bard', color: '#ffd700',
-    slides: [
-      '29–74% token reduction across all 6 dataset–model combinations. Fallback rate 0–5%. No systematic drop in answer quality — F1 is retained or improved in every combination tested.',
-      'Ablation confirms each component is necessary: the budget predictor alone saves 67–78% of tokens; compression adds ~10 pp more; the fallback prevents failures on hard edge cases.',
-      'The method requires no fine-tuning, no additional model calls, and no external labeled data beyond the dev split used for centroid calibration. It deploys on top of any retriever and generator without modifying either.',
-      'Future quests: (1) evaluate with dense retrieval to improve gold-document coverage at small budgets, (2) calibrate fallback thresholds from human annotation labels, (3) test budget predictor generalisation to out-of-domain settings.'
-    ]
-  }
-];
-
 const SECTIONS = [
   {
     id: 'goal',
@@ -1128,7 +1029,7 @@ Answer:</pre>`
       {
         html: `<span class="kicker">DATASET-LEVEL SUMMARY</span><table class="result-table"><tr><th>Dataset</th><th>Avg. Token Reduction</th><th>Avg. F1 Retention</th><th>Avg. Fallback</th><th>Interpretation</th></tr><tr><td>SciFact</td><td class="num good">73.3%</td><td class="num good">112.7%</td><td class="num">5.0%</td><td>Compact evidence is often enough.</td></tr><tr><td>HotpotQA</td><td class="num good">30.1%</td><td class="num">100.4%</td><td class="num">0.0%</td><td>Multi-hop questions need broader context.</td></tr><tr><td>BioASQ</td><td class="num good">50.3%</td><td class="num good">115.7%</td><td class="num">1.0%</td><td>Biomedical factoids benefit from focused evidence.</td></tr></table>`
       },
-      'Safe Adaptive uses fewer tokens in every setting. In five of the six settings, answer quality stays the same or improves.'
+      'Against Fixed Top-10, Safe Adaptive always saves many tokens and keeps answer quality close. Against Heuristic Rules, it is not always the top F1 method, but it is often much cheaper. HotpotQA is the main case where it spends more tokens to get stronger answers.'
     ]
   },
   {
@@ -1139,11 +1040,16 @@ Answer:</pre>`
     char: 'oracle',
     color: '#44dddd',
     slides: [
-      'The main experiments use TF-IDF because it is simple and easy to inspect. The cross-encoder test asks: what happens if a stronger reranker reorders the top-10 documents?',
+      {
+        html: `<span class="kicker">HOW THE CROSS-ENCODER WORKS</span><ul><li>Start with the same top-10 TF-IDF documents.</li><li>Pair the question with each candidate document.</li><li>The cross-encoder reads each pair together.</li><li>It gives each document a relevance score.</li><li>Then we reorder the top-10 list and run the same context methods again.</li></ul>`
+      },
       {
         html: `<table class="result-table"><tr><th>Dataset</th><th>Retriever</th><th>Fixed F1</th><th>Safe F1</th><th>Safe Tokens</th><th>Reduction</th><th>Safe nDCG</th></tr><tr><td>SciFact</td><td>TF-IDF</td><td class="num">0.262</td><td class="num">0.265</td><td class="num">933</td><td class="num good">72.6%</td><td class="num">0.560</td></tr><tr><td>SciFact</td><td>Cross-enc.</td><td class="num">0.261</td><td class="num">0.265</td><td class="num">939</td><td class="num good">72.5%</td><td class="num good">0.624</td></tr><tr><td>HotpotQA</td><td>TF-IDF</td><td class="num">0.765</td><td class="num">0.737</td><td class="num">1,066</td><td class="num good">30.6%</td><td class="num">0.742</td></tr><tr><td>HotpotQA</td><td>Cross-enc.</td><td class="num">0.764</td><td class="num good">0.751</td><td class="num">1,109</td><td class="num good">26.1%</td><td class="num good">0.829</td></tr><tr><td>BioASQ</td><td>TF-IDF</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">1,668</td><td class="num good">52.3%</td><td class="num">0.825</td></tr><tr><td>BioASQ</td><td>Cross-enc.</td><td class="num">0.338</td><td class="num">0.342</td><td class="num">814</td><td class="num good">76.7%</td><td class="num">0.672</td></tr></table>`
       },
-      'The result is still good. A stronger reranker can improve document order, and Safe Adaptive still saves many tokens.'
+      {
+        html: `<span class="kicker">WHAT CHANGES IN RANKING?</span><table class="result-table"><tr><th>Dataset</th><th>Method</th><th>TF-IDF nDCG</th><th>Cross nDCG</th><th>Change</th></tr><tr><td>SciFact</td><td>Fixed Top-10</td><td class="num">0.602</td><td class="num">0.649</td><td class="num good">+0.047</td></tr><tr><td>SciFact</td><td>Heuristic</td><td class="num">0.587</td><td class="num">0.639</td><td class="num good">+0.052</td></tr><tr><td>SciFact</td><td>Safe Adaptive</td><td class="num">0.560</td><td class="num">0.624</td><td class="num good">+0.064</td></tr><tr><td>HotpotQA</td><td>Fixed Top-10</td><td class="num">0.742</td><td class="num">0.829</td><td class="num good">+0.087</td></tr><tr><td>HotpotQA</td><td>Heuristic</td><td class="num">0.691</td><td class="num">0.804</td><td class="num good">+0.113</td></tr><tr><td>HotpotQA</td><td>Safe Adaptive</td><td class="num">0.742</td><td class="num">0.829</td><td class="num good">+0.087</td></tr><tr><td>BioASQ</td><td>Fixed Top-10</td><td class="num">0.868</td><td class="num">0.891</td><td class="num good">+0.023</td></tr><tr><td>BioASQ</td><td>Heuristic</td><td class="num">0.761</td><td class="num">0.766</td><td class="num">+0.005</td></tr><tr><td>BioASQ</td><td>Safe Adaptive</td><td class="num">0.825</td><td class="num">0.672</td><td class="num warn">-0.153</td></tr></table>`
+      },
+      'The key metric here is nDCG: it tells us whether useful documents move higher in the list. Cross-encoder reranking improves document order on SciFact and HotpotQA. It helps simpler order-based methods clearly, while Safe Adaptive changes the selected context too, so better ordering does not always become better answer scores.'
     ]
   },
   {
@@ -1161,7 +1067,7 @@ Answer:</pre>`
       {
         html: `<span class="kicker">ASQA RESULTS WITH LLAMA-70B</span><table class="result-table"><tr><th>Method</th><th>F1</th><th>Coverage</th><th>Semantic</th><th>Tokens</th><th>Reduction</th><th>Fallback</th></tr><tr><td>No Retrieval</td><td class="num">0.203</td><td class="num">0.159</td><td class="num">0.387</td><td class="num">113</td><td class="num">90.8%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-3</td><td class="num">0.398</td><td class="num">0.395</td><td class="num">0.772</td><td class="num">422</td><td class="num">65.7%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-5</td><td class="num">0.405</td><td class="num">0.417</td><td class="num">0.783</td><td class="num">625</td><td class="num">49.2%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-7</td><td class="num">0.407</td><td class="num good">0.423</td><td class="num good">0.790</td><td class="num">854</td><td class="num">30.6%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-10</td><td class="num">0.411</td><td class="num">0.419</td><td class="num">0.786</td><td class="num">1,229</td><td class="num">0.0%</td><td class="num">0.0%</td></tr><tr><td>Heuristic Rules</td><td class="num">0.393</td><td class="num">0.414</td><td class="num">0.782</td><td class="num">629</td><td class="num">48.8%</td><td class="num">0.0%</td></tr><tr><td>Safe Adaptive</td><td class="num good">0.417</td><td class="num">0.411</td><td class="num">0.782</td><td class="num">503</td><td class="num good">59.1%</td><td class="num">6.0%</td></tr></table>`
       },
-      'Takeaway: on ASQA, Safe Adaptive gets the highest F1 while using 59.1% fewer tokens than Fixed Top-10. Coverage is a little lower, so we should present this as promising, not as a final answer for all long-form RAG.'
+      'Takeaway: ASQA shows the same idea can work for longer answers. Safe Adaptive gets the highest F1 and uses fewer tokens than Fixed Top-5, Top-7, and Top-10. Coverage is slightly lower than some fixed baselines, so the trade-off is shorter prompts and strong F1, but we still need human checks for completeness.'
     ]
   },
   {
@@ -1191,228 +1097,8 @@ Answer:</pre>`
       {
         html: `<span class="kicker">FINAL TAKEAWAY</span><span class="big-line">Context size should be a decision.</span>Safe Adaptive sends focused evidence first. If the answer looks risky, it adds more context.`
       },
-      'Across the three main datasets and two model sizes, Safe Adaptive saves 29.6-73.9% of tokens compared with Fixed Top-10, while keeping at least 96.3% of the Fixed Top-10 F1 score.',
+      'Against Fixed Top-10, Safe Adaptive saves 29.6-73.9% of tokens while keeping at least 96.3% of the Fixed Top-10 F1 score. Against Heuristic Rules, it uses 22.6% fewer tokens on average and keeps 101.8% of the heuristic F1 on average. The exception is HotpotQA: Safe Adaptive spends 12.8-15.5% more tokens, but improves F1 by +0.029 to +0.058.',
       'So efficient RAG should not only ask: did we retrieve useful evidence? It should also ask: how much evidence is enough?',
-      {
-        html: `<span class="big-line">How much evidence is enough?</span><span class="small">Thank you. Questions?</span>`
-      }
-    ]
-  }
-];
-
-const DRAFT_SECTIONS = [
-  {
-    id: 'rag_basics',
-    nav: 'RAG BASICS',
-    name: 'ALDRIC THE HERALD',
-    title: 'RAG BASICS',
-    char: 'bard',
-    color: '#ffd700',
-    slides: [
-      {
-        html: `<span class="kicker">OPENING CONTEXT</span><span class="big-line">Question -> Retrieve -> Generate</span>Retrieval-Augmented Generation, or RAG, helps a language model answer by giving it retrieved evidence at generation time. Instead of answering only from internal model knowledge, the model receives documents in the prompt and uses them as supporting context.`
-      },
-      'The practical question is not only whether the retrieved documents are relevant. After retrieval, we still need to decide how much of that retrieved text should actually enter the prompt.',
-      'This project studies the step after retrieval: context selection. We ask whether a RAG system can choose the right amount and form of evidence to send to the model, reducing tokens when possible while keeping answer quality close to the full-context baseline.'
-    ]
-  },
-  {
-    id: 'problem',
-    nav: 'THE PROBLEM',
-    name: 'ORYN THE SCHOLAR',
-    title: 'THE PROBLEM - FIXED CONTEXT',
-    char: 'scholar',
-    color: '#66aaff',
-    slides: [
-      {
-        html: `<span class="kicker">WHY FIXED TOP-K IS A PROBLEM</span><ul><li>A simple factual question may need one sentence.</li><li>A multi-hop question may need evidence across several documents.</li><li>A longer explanatory question may need broader synthesis.</li></ul><div class="slide-note">But many RAG systems send the same top-k documents for all of them.</div>`
-      },
-      'Fixed top-k is operationally convenient, but it can waste prompt tokens, increase latency, and expose the model to distracting context.',
-      'This matters especially for smaller models. Prior work shows that irrelevant or poorly placed context can hurt LLM performance. In other words: more context is not automatically better.',
-      'Our motivation is to treat prompt context as a budgeted resource. The system should spend tokens when the task needs them, and save tokens when the useful evidence is concentrated.'
-    ]
-  },
-  {
-    id: 'question',
-    nav: 'QUESTION',
-    name: 'MIRA THE RANGER',
-    title: 'RESEARCH QUESTION',
-    char: 'ranger',
-    color: '#ffd700',
-    slides: [
-      {
-        html: `<span class="kicker">MAIN QUESTION</span><span class="big-line">How much evidence is enough?</span>If the initial retrieved candidate set stays the same, can a RAG system decide how much evidence to send to the model, and in what form?`
-      },
-      'We keep retrieval and context selection separate. Every method starts from the same retrieved top-10 documents. The only thing that changes is how those retrieved documents are converted into prompt context.',
-      'This means the project is not mainly about building a better retriever. It is about controlling the context after retrieval has already happened.',
-      {
-        html: `<span class="kicker">CONTRIBUTIONS</span><ul><li>Safe Adaptive Context: a task-aware context controller.</li><li>Evaluation on SciFact, HotpotQA, and BioASQ with two model scales.</li><li>Comparison against fixed top-k and heuristic rules.</li><li>Ablations, cross-encoder reranking, ASQA long-form test, and human annotation workflow.</li></ul>`
-      }
-    ]
-  },
-  {
-    id: 'system',
-    nav: 'THE SYSTEM',
-    name: 'THALRIC THE ALCHEMIST',
-    title: 'SAFE ADAPTIVE CONTEXT',
-    char: 'alchemist',
-    color: '#ff9944',
-    slides: [
-      {
-        html: `<span class="kicker">PIPELINE</span><ul><li>Retrieve the same top-10 documents.</li><li>Predict an initial context budget.</li><li>Compress or pack useful evidence.</li><li>Generate an answer.</li><li>Fallback to more context if the answer looks risky.</li></ul>`
-      },
-      'The first design choice is fairness: all methods share the same top-10 TF-IDF candidate list. Fixed baselines use prefixes of that list. Safe Adaptive decides how much of the same list should enter the prompt.',
-      'For adaptive evidence-style settings, Safe Adaptive predicts a compact document budget before generation. The predictor uses retrieval-side features only: query length, lexical diversity, top scores, score gaps, score ratios, score mass, entropy, and normalized entropy.',
-      'For compact evidence, each selected document is split into sentences. Sentences are scored with lexical overlap, rare query-term matches, phrase overlap, token density, and a small position bonus. The best sentence and its neighbors are retained.',
-      'For concise QA, aggressive compression can remove exact short-answer strings. So the controller instead uses broader sentence-level packing over the top-10 pool under a token budget.',
-      'The final safety step is answer-aware fallback. If the first answer is empty, weak, poorly grounded, or has low answer-context overlap, the system expands context: fuller evidence, larger budget, and finally full top-10 if needed.'
-    ]
-  },
-  {
-    id: 'setup',
-    nav: 'SETUP',
-    name: 'NOMA THE CARTOGRAPHER',
-    title: 'EXPERIMENTAL SETUP',
-    char: 'cartographer',
-    color: '#44cc88',
-    slides: [
-      {
-        html: `<span class="kicker">DATASETS</span><table class="result-table"><tr><th>Dataset</th><th>Task type</th><th>Evaluation role</th></tr><tr><td>SciFact</td><td>Biomedical claim verification</td><td>Focused evidence setting</td></tr><tr><td>HotpotQA</td><td>Multi-hop general QA</td><td>Broader evidence setting</td></tr><tr><td>BioASQ</td><td>Biomedical factoid QA</td><td>Short biomedical answer setting</td></tr><tr><td>ASQA</td><td>Long-form explanatory QA</td><td>Exploratory transfer test</td></tr></table><div class="slide-note">Main evaluation uses 100 held-out queries each for SciFact, HotpotQA, and BioASQ.</div>`
-      },
-      'Models: Mistral 7B is run locally through Ollama. Llama-3.3-70B-Instruct is accessed through a hosted API. Both use temperature 0 for the main evaluation.',
-      'Compared methods: No Retrieval, Fixed Top-3, Fixed Top-5, Fixed Top-7, Fixed Top-10, Heuristic Rules, and Safe Adaptive Context.',
-      'Metrics are grouped into three axes: answer quality (Token F1, semantic similarity, coverage), retrieval/context quality (nDCG@10, MRR@10), and efficiency (provider-reported tokens, token reduction, fallback rate).',
-      'Token counts are taken from provider-reported API usage fields. This matters because the efficiency comparison is based on actual prompt and completion usage, not only local estimates.'
-    ]
-  },
-  {
-    id: 'main_results',
-    nav: 'MAIN RESULTS',
-    name: 'VALE THE CAPTAIN',
-    title: 'MAIN RESULTS',
-    char: 'captain',
-    color: '#ff7799',
-    slides: [
-      {
-        html: `<span class="kicker">SAFE ADAPTIVE VS FIXED TOP-10</span><table class="result-table"><tr><th>Dataset</th><th>Model</th><th>Fixed F1</th><th>Safe F1</th><th>Fixed Tokens</th><th>Safe Tokens</th><th>Reduction</th></tr><tr><td>SciFact</td><td>Mistral</td><td class="num">0.204</td><td class="num good">0.253</td><td class="num">3,781</td><td class="num">985</td><td class="num good">73.9%</td></tr><tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.262</td><td class="num good">0.265</td><td class="num">3,412</td><td class="num">933</td><td class="num good">72.6%</td></tr><tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.516</td><td class="num good">0.540</td><td class="num">1,762</td><td class="num">1,240</td><td class="num good">29.6%</td></tr><tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.765</td><td class="num warn">0.737</td><td class="num">1,537</td><td class="num">1,066</td><td class="num good">30.6%</td></tr><tr><td>BioASQ</td><td>Mistral</td><td class="num">0.257</td><td class="num good">0.339</td><td class="num">3,889</td><td class="num">2,011</td><td class="num good">48.3%</td></tr><tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">3,496</td><td class="num">1,668</td><td class="num good">52.3%</td></tr></table><div class="slide-note">Central claim: Safe Adaptive reduces tokens in every setting while preserving or improving F1 in five of six settings.</div>`
-      },
-      {
-        html: `<span class="kicker">DATASET-LEVEL SUMMARY</span><table class="result-table"><tr><th>Dataset</th><th>Avg. Token Reduction</th><th>Avg. F1 Retention</th><th>Avg. Fallback</th><th>Interpretation</th></tr><tr><td>SciFact</td><td class="num good">73.3%</td><td class="num good">112.7%</td><td class="num">5.0%</td><td>Compact evidence is often enough</td></tr><tr><td>HotpotQA</td><td class="num good">30.1%</td><td class="num">100.4%</td><td class="num">0.0%</td><td>Multi-hop questions need broader context</td></tr><tr><td>BioASQ</td><td class="num good">50.3%</td><td class="num good">115.7%</td><td class="num">1.0%</td><td>Biomedical factoids benefit from focused evidence</td></tr></table>`
-      },
-      'Interpretation: SciFact saves the most because many claims can be verified from a small evidence span. HotpotQA saves less because multi-hop reasoning needs linked evidence. BioASQ is intermediate.',
-      'The one clear F1 decrease is HotpotQA with Llama-70B. Even there, Safe Adaptive retains 96.3% of Fixed Top-10 F1 while saving 30.6% of tokens.'
-    ]
-  },
-  {
-    id: 'heuristic',
-    nav: 'HEURISTIC',
-    name: 'SELKA THE MERCHANT',
-    title: 'SAFE ADAPTIVE VS HEURISTIC RULES',
-    char: 'merchant',
-    color: '#bb66ff',
-    slides: [
-      'The heuristic baseline is strong and explainable. It uses retrieval score gaps and query length to choose context size. This asks whether Safe Adaptive adds value beyond simple score-gap rules.',
-      {
-        html: `<table class="result-table"><tr><th>Dataset</th><th>Model</th><th>Heuristic F1</th><th>Safe F1</th><th>Heuristic Tokens</th><th>Safe Tokens</th><th>Token vs Heuristic</th></tr><tr><td>SciFact</td><td>Mistral</td><td class="num">0.265</td><td class="num">0.253</td><td class="num">2,652</td><td class="num">985</td><td class="num good">-62.9%</td></tr><tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.266</td><td class="num">0.265</td><td class="num">2,234</td><td class="num">933</td><td class="num good">-58.2%</td></tr><tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.482</td><td class="num good">0.540</td><td class="num">1,073</td><td class="num">1,240</td><td class="num warn">+15.5%</td></tr><tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.708</td><td class="num good">0.737</td><td class="num">945</td><td class="num">1,066</td><td class="num warn">+12.8%</td></tr><tr><td>BioASQ</td><td>Mistral</td><td class="num">0.333</td><td class="num good">0.339</td><td class="num">2,560</td><td class="num">2,011</td><td class="num good">-21.4%</td></tr><tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.349</td><td class="num">0.342</td><td class="num">2,126</td><td class="num">1,668</td><td class="num good">-21.5%</td></tr></table>`
-      },
-      'Safe Adaptive is much more token-efficient on SciFact and BioASQ. On HotpotQA, it spends slightly more than the heuristic but gives better F1, which fits the multi-hop nature of the task.'
-    ]
-  },
-  {
-    id: 'diagnostics',
-    nav: 'DIAGNOSTICS',
-    name: 'GARRON THE ENGINEER',
-    title: 'ABLATIONS AND DIAGNOSTICS',
-    char: 'engineer',
-    color: '#bb66ff',
-    slides: [
-      {
-        html: `<span class="kicker">COMPONENT ABLATION: SCIFACT + LLAMA-70B</span><table class="result-table"><tr><th>Variant</th><th>F1</th><th>Semantic</th><th>Tokens</th><th>Reduction</th><th>Fallback</th></tr><tr><td>Fixed Top-10</td><td class="num">0.247</td><td class="num">0.489</td><td class="num">3,325</td><td class="num">0.0%</td><td class="num">0.0%</td></tr><tr><td>Adaptive Compact Only</td><td class="num good">0.248</td><td class="num">0.481</td><td class="num">736</td><td class="num good">77.9%</td><td class="num">0.0%</td></tr><tr><td>Adaptive Full Only</td><td class="num">0.240</td><td class="num">0.485</td><td class="num">1,097</td><td class="num good">67.0%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-5 Compact + Fallback</td><td class="num good">0.258</td><td class="num">0.489</td><td class="num">1,209</td><td class="num good">63.6%</td><td class="num">4.0%</td></tr><tr><td>Full Safe Adaptive</td><td class="num">0.247</td><td class="num">0.477</td><td class="num">780</td><td class="num good">76.5%</td><td class="num">4.0%</td></tr></table>`
-      },
-      'The ablation shows that compact evidence is not simply a lossy shortcut. Adaptive Compact Only matches Fixed Top-10 F1 while using 77.9% fewer tokens.',
-      {
-        html: `<span class="kicker">COMPRESSION AND BUDGET DIAGNOSTIC</span><table class="result-table"><tr><th>Method</th><th>F1</th><th>Semantic</th><th>Tokens</th><th>Reduction</th></tr><tr><td>Fixed Full Context</td><td class="num">0.262</td><td class="num">0.569</td><td class="num">3,412</td><td class="num">0.0%</td></tr><tr><td>Compressed Fixed Full Context</td><td class="num">0.257</td><td class="num good">0.571</td><td class="num">2,150</td><td class="num good">37.0%</td></tr><tr><td>Heuristic Rules</td><td class="num good">0.266</td><td class="num good">0.575</td><td class="num">2,234</td><td class="num good">34.5%</td></tr><tr><td>Safe Adaptive Context</td><td class="num">0.265</td><td class="num">0.569</td><td class="num">933</td><td class="num good">72.6%</td></tr></table><div class="slide-note">Safe Adaptive combines compression with adaptive budgeting, giving much larger savings than compression alone.</div>`
-      }
-    ]
-  },
-  {
-    id: 'robustness',
-    nav: 'ROBUSTNESS',
-    name: 'LYARA THE ORACLE',
-    title: 'RERANKING AND LONG-FORM TEST',
-    char: 'oracle',
-    color: '#44dddd',
-    slides: [
-      {
-        html: `<span class="kicker">CROSS-ENCODER RERANKING CHECK</span><table class="result-table"><tr><th>Dataset</th><th>Retriever</th><th>Fixed F1</th><th>Safe F1</th><th>Safe Tokens</th><th>Reduction</th><th>Safe nDCG</th></tr><tr><td>SciFact</td><td>TF-IDF</td><td class="num">0.262</td><td class="num">0.265</td><td class="num">933</td><td class="num good">72.6%</td><td class="num">0.560</td></tr><tr><td>SciFact</td><td>Cross-enc.</td><td class="num">0.261</td><td class="num">0.265</td><td class="num">939</td><td class="num good">72.5%</td><td class="num good">0.624</td></tr><tr><td>HotpotQA</td><td>TF-IDF</td><td class="num">0.765</td><td class="num">0.737</td><td class="num">1,066</td><td class="num good">30.6%</td><td class="num">0.742</td></tr><tr><td>HotpotQA</td><td>Cross-enc.</td><td class="num">0.764</td><td class="num good">0.751</td><td class="num">1,109</td><td class="num good">26.1%</td><td class="num good">0.829</td></tr><tr><td>BioASQ</td><td>TF-IDF</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">1,668</td><td class="num good">52.3%</td><td class="num">0.825</td></tr><tr><td>BioASQ</td><td>Cross-enc.</td><td class="num">0.338</td><td class="num">0.342</td><td class="num">814</td><td class="num good">76.7%</td><td class="num">0.672</td></tr></table>`
-      },
-      'Cross-encoder reranking changes the operating point, but the quality-efficiency trade-off remains favorable. The method is not tied only to TF-IDF ordering.',
-      {
-        html: `<span class="kicker">EXPLORATORY ASQA LONG-FORM TEST</span><table class="result-table"><tr><th>Method</th><th>F1</th><th>Coverage</th><th>Semantic</th><th>Tokens</th><th>Reduction</th><th>Fallback</th></tr><tr><td>Fixed Top-3</td><td class="num">0.398</td><td class="num">0.395</td><td class="num">0.772</td><td class="num">422</td><td class="num">65.7%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-5</td><td class="num">0.405</td><td class="num good">0.417</td><td class="num">0.783</td><td class="num">625</td><td class="num">49.2%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-7</td><td class="num">0.407</td><td class="num good">0.423</td><td class="num good">0.790</td><td class="num">854</td><td class="num">30.6%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-10</td><td class="num">0.411</td><td class="num">0.419</td><td class="num">0.786</td><td class="num">1,229</td><td class="num">0.0%</td><td class="num">0.0%</td></tr><tr><td>Heuristic Rules</td><td class="num">0.393</td><td class="num">0.414</td><td class="num">0.782</td><td class="num">629</td><td class="num">48.8%</td><td class="num">0.0%</td></tr><tr><td>Safe Adaptive</td><td class="num good">0.417</td><td class="num">0.411</td><td class="num">0.782</td><td class="num">503</td><td class="num good">59.1%</td><td class="num">6.0%</td></tr></table>`
-      },
-      'ASQA should be treated as a stress test, not the main benchmark. It suggests the principle transfers to longer answers, but long-form QA needs more careful evaluation than token overlap alone.'
-    ]
-  },
-  {
-    id: 'annotation',
-    nav: 'ANNOTATION',
-    name: 'PENNA THE SCRIBE',
-    title: 'HUMAN ANNOTATION STUDY',
-    char: 'scribe',
-    color: '#ffd700',
-    slides: [
-      'Automatic metrics are useful, but they do not fully measure factual correctness. Token F1 can penalize correct paraphrases, while semantic similarity can over-credit related but incorrect answers.',
-      {
-        html: `<span class="kicker">ANNOTATION PROTOCOL</span><table class="result-table"><tr><th>Item</th><th>Design</th></tr><tr><td>Sample size</td><td>120 Safe Adaptive outputs</td></tr><tr><td>Datasets</td><td>40 SciFact, 40 HotpotQA, 40 BioASQ</td></tr><tr><td>Annotators</td><td>Two independent annotators</td></tr><tr><td>Shown fields</td><td>Query, reference answer, model answer, retrieved evidence</td></tr><tr><td>Interface</td><td>Browser workform with save, CSV import/export, search, filters, dataset tabs</td></tr><tr><td>Agreement</td><td>Cohen kappa and disagreement list for adjudication</td></tr></table>`
-      },
-      {
-        html: `<span class="kicker">EXPECTED OUTCOMES</span><table class="result-table"><tr><th>Dataset</th><th>Expected annotation pattern</th><th>Reason</th></tr><tr><td>SciFact</td><td>More NOT_ENOUGH_INFO</td><td>Claim verification can require precise evidence; compact selection may miss evidence lower in the ranking.</td></tr><tr><td>HotpotQA</td><td>Higher CORRECT rate</td><td>Automatic results show high F1 retention and zero fallback rate.</td></tr><tr><td>BioASQ</td><td>More PARTIALLY_CORRECT</td><td>Model answers often elaborate beyond concise biomedical reference phrases.</td></tr></table>`
-      },
-      'The annotation study is the reality check for the automatic metrics. It helps identify where Safe Adaptive preserves factual correctness, where it is only partially correct, and where fallback thresholds need calibration.'
-    ]
-  },
-  {
-    id: 'discussion',
-    nav: 'DISCUSSION',
-    name: 'LYARA THE SORCERESS',
-    title: 'DISCUSSION',
-    char: 'sorceress',
-    color: '#44dddd',
-    slides: [
-      'The central finding is that context size is a decision variable, not a fixed setting. Fixed Top-10 is simple, but it is not uniformly best.',
-      'The gains follow task structure. SciFact is easiest to compress, HotpotQA is the limiting multi-hop case, and BioASQ sits between them.',
-      'Smaller models appear more sensitive to noisy long prompts. For Mistral on SciFact and BioASQ, smaller or compressed contexts improve Token F1 by removing distracting passages.',
-      'Better retrieval does not replace adaptive budgeting. It can make the budget decision safer by moving useful evidence earlier and making score distributions sharper.',
-      'The broader implication: efficient RAG should ask not only whether retrieved evidence is relevant, but how much evidence is enough for this query, retriever, and generator.'
-    ]
-  },
-  {
-    id: 'limitations',
-    nav: 'LIMITATIONS',
-    name: 'ELION THE CLERIC',
-    title: 'LIMITATIONS',
-    char: 'cleric',
-    color: '#44cc88',
-    slides: [
-      {
-        html: `<span class="kicker">LIMITATIONS</span><ul><li>The method depends on retrieval quality. If useful evidence is not in the candidate set, the context controller cannot recover it.</li><li>Fallback thresholds are heuristic and should be calibrated with human labels.</li><li>Automatic metrics do not fully capture factual correctness, especially for biomedical and long-form answers.</li><li>SciFact and BioASQ are biomedical datasets, so outputs should not be treated as medical advice.</li><li>Generalization to stronger dense retrievers and broader domains needs further testing.</li></ul>`
-      }
-    ]
-  },
-  {
-    id: 'conclusion',
-    nav: 'CONCLUSION',
-    name: 'CAIUS THE KNIGHT',
-    title: 'CONCLUSION',
-    char: 'knight',
-    color: '#ffd700',
-    slides: [
-      {
-        html: `<span class="kicker">FINAL TAKEAWAY</span><span class="big-line">Context size should be a decision.</span>Safe Adaptive Context reduces RAG token use by adapting context size and expanding only when generated answers appear risky.`
-      },
-      'Across three main datasets and two model scales, it saves 29.6-73.9% of tokens relative to Fixed Top-10 while retaining at least 96.3% of Fixed Top-10 token F1.',
-      'Ablations show that adaptive budgeting and lexical evidence compression are the main efficiency drivers. Cross-encoder reranking confirms the trade-off is not tied only to TF-IDF ordering.',
-      'Future work should evaluate stronger dense retrievers, calibrate fallback thresholds using human labels, and test whether the budget predictor generalizes to broader out-of-domain RAG settings.',
       {
         html: `<span class="big-line">How much evidence is enough?</span><span class="small">Thank you. Questions?</span>`
       }
@@ -1517,9 +1203,9 @@ function typewrite(text) {
 // ── Fullscreen ────────────────────────────────────────────────
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
+    document.documentElement.requestFullscreen?.();
   } else {
-    document.exitFullscreen();
+    document.exitFullscreen?.();
   }
 }
 
