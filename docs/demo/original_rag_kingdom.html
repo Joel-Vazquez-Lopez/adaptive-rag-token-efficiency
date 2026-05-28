@@ -460,7 +460,7 @@ body::after {
     <canvas id="portrait-canvas" width="108" height="108"></canvas>
     <div id="portrait-label">SELECT A CHAPTER</div>
     <div id="nav-list"></div>
-    <div id="sidebar-footer">← → ARROWS · ESC BACK</div>
+    <div id="sidebar-footer">← → ARROWS · ESC BACK · F FULLSCREEN</div>
   </div>
 
   <!-- ── MAIN ── -->
@@ -476,6 +476,7 @@ body::after {
         Joel Vazquez · Sheraz Ahmad
       </div>
       <div class="hint">▶ SELECT A CHAPTER FROM THE LEFT TO BEGIN ◀</div>
+      <button class="btn" id="btn-fullscreen" onclick="toggleFullscreen()" style="margin-top:8px;font-size:7px;padding:10px 22px;">⛶ ENTER FULLSCREEN [F]</button>
     </div>
 
     <div id="topbar">
@@ -1420,7 +1421,7 @@ const DRAFT_SECTIONS = [
 ];
 
 // ── State ─────────────────────────────────────────────────────
-let currentIdx = -1, slide = 0, tyTimer = null, typingRun = 0;
+let currentIdx = -1, slide = 0;
 
 // ── Build stars ───────────────────────────────────────────────
 function buildStars() {
@@ -1504,87 +1505,28 @@ function render() {
 }
 
 function showHtml(html) {
-  clearTimeout(tyTimer);
-  const run = ++typingRun;
   const el = document.getElementById('slide-text');
-  el.innerHTML = '';
-  const inner = document.createElement('div');
-  inner.className = 'slide-inner';
-  el.appendChild(inner);
-  const source = document.createElement('div');
-  source.innerHTML = html;
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-  inner.appendChild(cursor);
-
-  function copyAttrs(from, to) {
-    [...from.attributes].forEach(attr => to.setAttribute(attr.name, attr.value));
-  }
-
-  function typeTextNode(text, parent, done) {
-    let i = 0;
-    const node = document.createTextNode('');
-    if (parent === inner) parent.insertBefore(node, cursor);
-    else parent.appendChild(node);
-    parent.appendChild(cursor);
-    function tick() {
-      if (run !== typingRun) return;
-      if (i < text.length) {
-        node.textContent += text[i++];
-        parent.appendChild(cursor);
-        tyTimer = setTimeout(tick, 12);
-      } else {
-        done();
-      }
-    }
-    tick();
-  }
-
-  function typeChildren(children, parent, done) {
-    let i = 0;
-    function next() {
-      if (run !== typingRun) return;
-      if (i >= children.length) return done();
-      const child = children[i++];
-      if (child.nodeType === Node.TEXT_NODE) {
-        typeTextNode(child.textContent, parent, next);
-      } else if (child.nodeType === Node.ELEMENT_NODE) {
-        const clone = document.createElement(child.tagName.toLowerCase());
-        copyAttrs(child, clone);
-        if (parent === inner) parent.insertBefore(clone, cursor);
-        else parent.appendChild(clone);
-        typeChildren([...child.childNodes], clone, next);
-      } else {
-        next();
-      }
-    }
-    next();
-  }
-
-  typeChildren([...source.childNodes], el, () => {
-    if (run !== typingRun) return;
-    // Keep the cursor at the last typed position. Moving it back to the
-    // wrapper after HTML/list slides finish causes a visible layout jump.
-  });
+  el.innerHTML = `<div class="slide-inner">${html}</div>`;
 }
 
 function typewrite(text) {
-  clearTimeout(tyTimer);
-  const run = ++typingRun;
   const el = document.getElementById('slide-text');
-  el.innerHTML = '';
-  const inner = document.createElement('div');
-  inner.className = 'slide-inner';
-  el.appendChild(inner);
-  const cursor = document.createElement('span'); cursor.className = 'cursor';
-  inner.appendChild(cursor);
-  let i = 0;
-  function tick() {
-    if (run !== typingRun) return;
-    if (i < text.length) { cursor.before(text[i++]); tyTimer = setTimeout(tick, 24); }
-  }
-  tick();
+  el.innerHTML = `<div class="slide-inner">${text}</div>`;
 }
+
+// ── Fullscreen ────────────────────────────────────────────────
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  const btn = document.getElementById('btn-fullscreen');
+  if (btn) btn.textContent = document.fullscreenElement ? '⛶ EXIT FULLSCREEN [F]' : '⛶ ENTER FULLSCREEN [F]';
+});
 
 // ── Init ──────────────────────────────────────────────────────
 buildStars();
@@ -1592,6 +1534,7 @@ buildNav();
 drawIdle();
 
 document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') { toggleFullscreen(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(1);
   if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navigate(-1);
   if (e.key === 'Escape' && currentIdx >= 0) {
