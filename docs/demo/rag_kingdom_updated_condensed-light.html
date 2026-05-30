@@ -1434,28 +1434,71 @@ const SECTIONS = [
       <div style="margin-top:12px;font-size:15px;color:#777;line-height:1.8;">Heuristic sends full documents — no compression. Safe Adaptive adds compression, using 63% fewer tokens on SciFact at the same F1.</div>` }]
   },
   {
+    id: 'safe_vs_baselines',
+    nav: '11 · SAFE VS BASELINES',
+    name: 'VALE THE CAPTAIN',
+    title: '11 · SAFE ADAPTIVE VS BASELINES',
+    char: 'captain',
+    color: '#a07828',
+    slides: [
+      { html: `
+      <span class="kicker">SAFE ADAPTIVE VS FIXED TOP-10</span>
+      <table class="result-table" style="font-size:18px;line-height:1.55;margin-top:10px;">
+        <tr><th>Dataset</th><th>Model</th><th>Fixed F1</th><th>Safe F1</th><th>Safe Tokens</th><th>Reduction</th></tr>
+        <tr><td>SciFact</td><td>Mistral</td><td class="num">0.204</td><td class="num good">0.253</td><td class="num">985</td><td class="num good">73.9%</td></tr>
+        <tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.262</td><td class="num good">0.265</td><td class="num">933</td><td class="num good">72.6%</td></tr>
+        <tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.516</td><td class="num good">0.540</td><td class="num">1,240</td><td class="num good">29.6%</td></tr>
+        <tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.765</td><td class="num warn">0.737</td><td class="num">1,066</td><td class="num good">30.6%</td></tr>
+        <tr><td>BioASQ</td><td>Mistral</td><td class="num">0.257</td><td class="num good">0.339</td><td class="num">2,011</td><td class="num good">48.3%</td></tr>
+        <tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">1,668</td><td class="num good">52.3%</td></tr>
+      </table>
+      <div class="slide-note">This is the main efficiency result: Safe Adaptive cuts 29.6–73.9% of tokens versus Fixed Top-10 while preserving or improving F1 in 5 of 6 dataset–model pairs. The only F1 drop is HotpotQA with Llama-70B, where it still retains 96.3% of Fixed Top-10 F1.</div>
+      <ul style="margin-top:14px;">
+        <li>SciFact and BioASQ show the largest savings because useful evidence is concentrated.</li>
+        <li>HotpotQA saves less because multi-hop questions need broader evidence coverage.</li>
+      </ul>` },
+      { html: `
+      <span class="kicker">SAFE ADAPTIVE VS HEURISTIC RULES</span>
+      <table class="result-table" style="font-size:18px;line-height:1.55;margin-top:10px;">
+        <tr><th>Dataset</th><th>Model</th><th>Heur. F1</th><th>Safe F1</th><th>Token Change</th><th>Takeaway</th></tr>
+        <tr><td>SciFact</td><td>Mistral</td><td class="num">0.265</td><td class="num">0.253</td><td class="num good">-62.9%</td><td>Much cheaper</td></tr>
+        <tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.266</td><td class="num">0.265</td><td class="num good">-58.2%</td><td>Same quality</td></tr>
+        <tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.482</td><td class="num good">0.540</td><td class="num warn">+15.5%</td><td>Higher F1</td></tr>
+        <tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.708</td><td class="num good">0.737</td><td class="num warn">+12.8%</td><td>Higher F1</td></tr>
+        <tr><td>BioASQ</td><td>Mistral</td><td class="num">0.333</td><td class="num good">0.339</td><td class="num good">-21.4%</td><td>Better + cheaper</td></tr>
+        <tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.349</td><td class="num">0.342</td><td class="num good">-21.5%</td><td>Cheaper</td></tr>
+      </table>
+      <div class="slide-note">Heuristic Rules is the strong simple adaptive baseline: it changes budget from retrieval score gaps but still sends full documents. Safe Adaptive adds compact evidence selection and answer-aware fallback.</div>
+      <ul style="margin-top:14px;">
+        <li>On SciFact, Safe Adaptive is slightly lower in F1 but dramatically cheaper.</li>
+        <li>On HotpotQA, it spends modestly more than Heuristic Rules but buys a clear F1 gain.</li>
+        <li>On BioASQ, it is cheaper, and with Mistral it is also higher F1.</li>
+      </ul>` }
+    ]
+  },
+  {
     id: 'cross_encoder',
-    nav: '11 · CROSS-ENCODER',
+    nav: '12 · CROSS-ENCODER',
     name: 'LYARA THE ORACLE',
-    title: '11 · CROSS-ENCODER RERANKING',
+    title: '12 · CROSS-ENCODER RERANKING',
     char: 'oracle',
     color: '#a07828',
     slides: [{ html: `<span class="kicker">TF-IDF VS TF-IDF + CROSS-ENCODER</span><table class="result-table"><tr><th>Dataset</th><th>Retriever</th><th>Fixed F1</th><th>Safe F1</th><th>Safe Tokens</th><th>Reduction</th><th>Safe nDCG</th></tr><tr><td>SciFact</td><td>TF-IDF</td><td class="num">0.262</td><td class="num">0.265</td><td class="num">933</td><td class="num good">72.6%</td><td class="num">0.560</td></tr><tr><td>SciFact</td><td>Cross-enc.</td><td class="num">0.261</td><td class="num">0.265</td><td class="num">939</td><td class="num good">72.5%</td><td class="num good">0.624</td></tr><tr><td>HotpotQA</td><td>TF-IDF</td><td class="num">0.765</td><td class="num">0.737</td><td class="num">1,066</td><td class="num good">30.6%</td><td class="num">0.742</td></tr><tr><td>HotpotQA</td><td>Cross-enc.</td><td class="num">0.764</td><td class="num good">0.751</td><td class="num">1,109</td><td class="num good">26.1%</td><td class="num good">0.829</td></tr><tr><td>BioASQ</td><td>TF-IDF</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">1,668</td><td class="num good">52.3%</td><td class="num">0.825</td></tr><tr><td>BioASQ</td><td>Cross-enc.</td><td class="num">0.338</td><td class="num">0.342</td><td class="num">814</td><td class="num good">76.7%</td><td class="num">0.672</td></tr></table><div class="slide-note">The key metric here is nDCG: it shows whether useful documents move higher in the ranking. Cross-encoder reranking improves ordering on SciFact and HotpotQA, while Safe Adaptive still keeps strong token savings.</div>` }]
   },
   {
     id: 'asqa',
-    nav: '12 · ASQA TEST',
+    nav: '13 · ASQA TEST',
     name: 'GARRON THE ENGINEER',
-    title: '12 · ASQA LONG-FORM TEST',
+    title: '13 · ASQA LONG-FORM TEST',
     char: 'engineer',
     color: '#a07828',
     slides: [{ html: `<span class="kicker">ASQA RESULTS WITH LLAMA-70B</span><table class="result-table"><tr><th>Method</th><th>F1</th><th>Coverage</th><th>Semantic</th><th>Tokens</th><th>Reduction</th><th>Fallback</th></tr><tr><td>No Retrieval</td><td class="num">0.203</td><td class="num">0.159</td><td class="num">0.387</td><td class="num">113</td><td class="num">90.8%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-3</td><td class="num">0.398</td><td class="num">0.395</td><td class="num">0.772</td><td class="num">422</td><td class="num">65.7%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-5</td><td class="num">0.405</td><td class="num">0.417</td><td class="num">0.783</td><td class="num">625</td><td class="num">49.2%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-7</td><td class="num">0.407</td><td class="num good">0.423</td><td class="num good">0.790</td><td class="num">854</td><td class="num">30.6%</td><td class="num">0.0%</td></tr><tr><td>Fixed Top-10</td><td class="num">0.411</td><td class="num">0.419</td><td class="num">0.786</td><td class="num">1,229</td><td class="num">0.0%</td><td class="num">0.0%</td></tr><tr><td>Heuristic Rules</td><td class="num">0.393</td><td class="num">0.414</td><td class="num">0.782</td><td class="num">629</td><td class="num">48.8%</td><td class="num">0.0%</td></tr><tr><td>Safe Adaptive</td><td class="num good">0.417</td><td class="num">0.411</td><td class="num">0.782</td><td class="num">503</td><td class="num good">59.1%</td><td class="num">6.0%</td></tr></table><div class="slide-note">ASQA is exploratory because long answers are harder to evaluate. Safe Adaptive gets the highest F1 while using 59.1% fewer tokens than Fixed Top-10, but coverage is slightly lower, so human checks matter.</div>` }]
   },
   {
     id: 'analysis',
-    nav: '13 · ANALYSIS',
+    nav: '14 · ANALYSIS',
     name: 'LYARA THE ORACLE',
-    title: '13 · ANALYSIS',
+    title: '14 · ANALYSIS',
     char: 'oracle',
     color: '#a07828',
     slides: [{ html: `<table class="result-table">
@@ -1473,35 +1516,37 @@ const SECTIONS = [
   },
   {
     id: 'annotation',
-    nav: '14 · HUMAN EVALUATION',
+    nav: '15 · HUMAN EVALUATION',
     name: 'PENNA THE SCRIBE',
-    title: '14 · HUMAN EVALUATION',
+    title: '15 · HUMAN EVALUATION',
     char: 'scribe',
     color: '#a07828',
     slides: [{ html: `<ul>
-        <li>Token F1 can penalise correct paraphrases; semantic similarity can over-credit related but wrong answers.</li>
-        <li>Human annotation provides a factual correctness check that automatic metrics cannot.</li>
+        <li>Two annotators labelled 120 Safe Adaptive outputs: 40 SciFact, 40 HotpotQA, 40 BioASQ.</li>
+        <li>Agreement: 84 / 120 matched items, 70.0% raw agreement, Cohen's κ = 0.477.</li>
       </ul>
-      <table class="result-table">
-        <tr><th>Item</th><th>Design</th></tr>
-        <tr><td>Sample size</td><td>120 Safe Adaptive outputs</td></tr>
-        <tr><td>Datasets</td><td>40 SciFact, 40 HotpotQA, 40 BioASQ</td></tr>
-        <tr><td>Annotators</td><td>Two independent annotators</td></tr>
-        <tr><td>Shown fields</td><td>Query, reference answer, model answer, retrieved evidence</td></tr>
-        <tr><td>Agreement</td><td>Cohen kappa and disagreement list for adjudication</td></tr>
+      <span class="kicker">LABEL DISTRIBUTION — BOTH ANNOTATORS</span>
+      <table class="result-table" style="font-size:17px;line-height:1.45;margin-top:8px;">
+        <tr><th>Dataset</th><th>Correct</th><th>Partial</th><th>Incorrect</th><th>Not Enough Info</th></tr>
+        <tr><td>SciFact</td><td class="num good">49</td><td class="num">15</td><td class="num">14</td><td class="num">2</td></tr>
+        <tr><td>HotpotQA</td><td class="num good">54</td><td class="num">1</td><td class="num">17</td><td class="num">8</td></tr>
+        <tr><td>BioASQ</td><td class="num good">44</td><td class="num warn">18</td><td class="num">14</td><td class="num">4</td></tr>
+        <tr><td>Overall</td><td class="num good">147</td><td class="num">34</td><td class="num">45</td><td class="num">14</td></tr>
       </table>
-      <span class="kicker">EXPECTED PATTERNS</span>
+      <span class="kicker" style="margin-top:14px;display:block;">WHAT THE HUMAN RESULTS SHOW</span>
       <ul>
-        <li>SciFact: more NOT_ENOUGH_INFO — compact selection may miss evidence lower in the ranking.</li>
-        <li>HotpotQA: higher CORRECT rate — high F1 retention and zero fallback rate.</li>
-        <li>BioASQ: more PARTIALLY_CORRECT — model answers often elaborate beyond concise reference phrases.</li>
-      </ul>` }]
+        <li>Most labels are CORRECT: 147 / 240 = 61.3%; CORRECT + PARTIAL = 75.4%.</li>
+        <li>HotpotQA has the strongest human outcome: 54 CORRECT labels and 26 / 30 agreed examples correct.</li>
+        <li>BioASQ has the most PARTIALLY_CORRECT labels, matching biomedical answers that are relevant but incomplete.</li>
+        <li>Metric check: all high-F1 agreed examples were CORRECT; high semantic examples were 95.9% CORRECT.</li>
+      </ul>
+      <div class="slide-note">Human annotation supports the automatic trends, but also shows why F1, semantic similarity, and coverage should be read together.</div>` }]
   },
   {
     id: 'conclusion',
-    nav: '15 · CONCLUSION',
+    nav: '16 · CONCLUSION',
     name: 'CAIUS THE KNIGHT',
-    title: '15 · CONCLUSION',
+    title: '16 · CONCLUSION',
     char: 'knight',
     color: '#a07828',
     slides: [{ html: `<span class="kicker">FINAL TAKEAWAY</span>
@@ -1520,9 +1565,9 @@ const SECTIONS = [
   },
   {
     id: 'final_question',
-    nav: '16 · FINAL QUESTION',
+    nav: '17 · FINAL QUESTION',
     name: 'AUREN THE KING',
-    title: '16 · FINAL QUESTION',
+    title: '17 · FINAL QUESTION',
     char: 'king',
     color: '#a07828',
     slides: [{ html: `<p>Efficient RAG should not only ask: did we retrieve useful evidence?</p>
