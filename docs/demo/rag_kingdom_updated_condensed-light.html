@@ -357,7 +357,7 @@ html, body {
 .result-table th,
 .result-table td {
   border: 1px solid #ccc8b4;
-  padding: 10px 14px;
+  padding: 9px 18px;
   text-align: left;
   vertical-align: top;
 }
@@ -1307,38 +1307,37 @@ const SECTIONS = [
       { html: `
         <span class="big-line" style="font-size:36px;">Strategies</span>
         <p style="font-size:18px;color:#777;margin-top:4px;margin-bottom:24px;line-height:1.7;">Seven methods, all starting from the same top-10 documents retrieved with <b style="color:var(--col);">TF-IDF cosine similarity</b>. The only variable is how much of that context enters the prompt.</p>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <div style="flex:1;border:1px solid #bbb;padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:#777;">No Retrieval</div>
-            <div style="font-size:14px;color:#999;margin-top:6px;line-height:1.5;">no context</div>
+        <div style="display:flex;gap:10px;margin-bottom:12px;">
+          <div style="flex:1;border:1px solid #bbb;padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:#777;">No Retrieval</div>
+            <div style="font-size:15px;color:#999;margin-top:8px;line-height:1.5;">no context</div>
           </div>
-          <div style="flex:1;border:1px solid var(--col);padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:var(--col);">Fixed Top-3</div>
-            <div style="font-size:14px;color:#777;margin-top:6px;line-height:1.5;">always 3 docs</div>
+          <div style="flex:1;border:1px solid var(--col);padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:var(--col);">Fixed Top-3</div>
+            <div style="font-size:15px;color:#777;margin-top:8px;line-height:1.5;">always 3 docs</div>
           </div>
-          <div style="flex:1;border:1px solid var(--col);padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:var(--col);">Fixed Top-5</div>
-            <div style="font-size:14px;color:#777;margin-top:6px;line-height:1.5;">always 5 docs</div>
+          <div style="flex:1;border:1px solid var(--col);padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:var(--col);">Fixed Top-5</div>
+            <div style="font-size:15px;color:#777;margin-top:8px;line-height:1.5;">always 5 docs</div>
           </div>
-          <div style="flex:1;border:1px solid var(--col);padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:var(--col);">Fixed Top-7</div>
-            <div style="font-size:14px;color:#777;margin-top:6px;line-height:1.5;">always 7 docs</div>
+          <div style="flex:1;border:1px solid var(--col);padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:var(--col);">Fixed Top-7</div>
+            <div style="font-size:15px;color:#777;margin-top:8px;line-height:1.5;">always 7 docs</div>
           </div>
-          <div style="flex:1;border:1px solid var(--col);padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:var(--col);">Fixed Top-10</div>
-            <div style="font-size:14px;color:#777;margin-top:6px;line-height:1.5;">all 10, expensive</div>
+          <div style="flex:1;border:1px solid var(--col);padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:var(--col);">Fixed Top-10</div>
+            <div style="font-size:15px;color:#777;margin-top:8px;line-height:1.5;">all 10, expensive</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;">
-          <div style="flex:1;border:1px solid #6688cc;padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:#6688cc;">Heuristic Rules</div>
-            <div style="font-size:14px;color:#777;margin-top:6px;line-height:1.5;">score-gap formula, no training</div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;">
+          <div style="width:280px;border:1px solid #6688cc;padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:#6688cc;">Heuristic Rules</div>
+            <div style="font-size:15px;color:#777;margin-top:8px;line-height:1.5;">score-gap formula, no training</div>
           </div>
-          <div style="flex:1;border:2px solid #5db88a;background:rgba(93,184,138,.07);padding:14px 8px;text-align:center;">
-            <div style="font-size:18px;color:#5db88a;font-weight:bold;">Safe Adaptive ★</div>
-            <div style="font-size:14px;color:#5db88a;margin-top:6px;line-height:1.5;">budget + compression + fallback</div>
+          <div style="width:280px;border:2px solid #5db88a;background:rgba(93,184,138,.07);padding:22px 10px;text-align:center;">
+            <div style="font-size:20px;color:#5db88a;font-weight:bold;">Safe Adaptive ★</div>
+            <div style="font-size:15px;color:#5db88a;margin-top:8px;line-height:1.5;">budget + compression + fallback</div>
           </div>
-          <div style="flex:3;"></div>
         </div>` }
     ]
   },
@@ -1351,57 +1350,51 @@ const SECTIONS = [
     color: '#a07828',
     slides: [
       { html: `
-        <div style="font-size:18px;color:#666;line-height:1.7;margin-bottom:20px;padding:10px 14px;border-left:3px solid var(--col);background:rgba(160,120,40,.05);"><b style="color:var(--col);">Fixed Top-K</b> always sends exactly K documents to the LLM regardless of the query — the number is hardcoded, not learned. We test K = 3, 5, 8, 10. Fixed Top-10 is the main expensive baseline.</div>
-        <div style="display:flex;gap:14px;">
-          <div style="flex:1;border:2px solid #c98844;padding:16px;text-align:center;">
-            <div style="font-size:15px;color:#777;margin-bottom:8px;">SciFact · Mistral · Fixed Top-10</div>
-            <div style="font-size:36px;color:#c98844;line-height:1.3;">0.204 F1</div>
-            <div style="font-size:36px;color:#c98844;line-height:1.3;">0.364 Sem</div>
-            <div style="font-size:14px;color:#c98844;margin-top:8px;"><b>⚠ No Retrieval scores higher — more docs made it worse</b></div>
-          </div>
-          <div style="flex:1;border:2px solid #c98844;padding:16px;text-align:center;">
-            <div style="font-size:15px;color:#777;margin-bottom:8px;">BioASQ · Mistral · Fixed Top-10</div>
-            <div style="font-size:36px;color:#c98844;line-height:1.3;">0.257 F1</div>
-            <div style="font-size:36px;color:#c98844;line-height:1.3;">0.606 Sem</div>
-            <div style="font-size:14px;color:#5db88a;margin-top:8px;"><b>✓ Fixed Top-3 gets 0.333 F1 — fewer docs = better quality</b></div>
-          </div>
-          <div style="flex:1;border:2px solid #5db88a;padding:16px;text-align:center;">
-            <div style="font-size:15px;color:#777;margin-bottom:8px;">HotpotQA · Mistral · Fixed Top-10</div>
-            <div style="font-size:36px;color:#5db88a;line-height:1.3;">0.516 F1</div>
-            <div style="font-size:36px;color:#5db88a;line-height:1.3;">0.529 Sem</div>
-            <div style="font-size:14px;color:#777;margin-top:8px;">Multi-hop needs all docs — more context helps here</div>
-          </div>
-        </div>` },
-      { html: `
-        <span class="big-line" style="font-size:28px;">SciFact — F1 and Semantic Similarity as K increases</span>
-        <p style="font-size:17px;color:#888;margin-top:6px;margin-bottom:24px;line-height:1.7;">Clearest example that more docs can hurt. Same trend on BioASQ. HotpotQA is the exception.</p>
-        <div style="margin-bottom:20px;">
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
-            <span style="width:56px;font-size:18px;color:#777;text-align:right;flex-shrink:0;">Top-3</span>
-            <div style="height:28px;width:55%;background:#5db88a;opacity:.85;flex-shrink:0;border-radius:2px;"></div>
-            <span style="font-size:18px;color:#5db88a;">0.268 F1</span>
-            <span style="font-size:16px;color:#777;">· 0.439 sem</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
-            <span style="width:56px;font-size:18px;color:#777;text-align:right;flex-shrink:0;">Top-5</span>
-            <div style="height:28px;width:54%;background:#5db88a;opacity:.85;flex-shrink:0;border-radius:2px;"></div>
-            <span style="font-size:18px;color:#5db88a;">0.265 F1</span>
-            <span style="font-size:16px;color:#777;">· 0.443 sem</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
-            <span style="width:56px;font-size:18px;color:#777;text-align:right;flex-shrink:0;">Top-8</span>
-            <div style="height:28px;width:53%;background:#5db88a;opacity:.85;flex-shrink:0;border-radius:2px;"></div>
-            <span style="font-size:18px;color:#5db88a;">0.262 F1</span>
-            <span style="font-size:16px;color:#777;">· 0.439 sem</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:14px;">
-            <span style="width:56px;font-size:18px;color:#c98844;text-align:right;flex-shrink:0;">Top-10</span>
-            <div style="height:28px;width:41%;background:#c98844;flex-shrink:0;border-radius:2px;"></div>
-            <span style="font-size:18px;color:#c98844;">0.204 F1 ↓</span>
-            <span style="font-size:16px;color:#c98844;">· 0.364 sem ↓</span>
-          </div>
+        <div style="font-size:17px;color:#666;line-height:1.6;margin-bottom:10px;padding:8px 14px;border-left:3px solid var(--col);background:rgba(160,120,40,.05);"><b style="color:var(--col);">Fixed Top-K</b> always sends exactly K documents regardless of the query — hardcoded, not learned. We test K = 3, 5, 7, 10.</div>
+        <div style="font-size:19px;color:var(--text);margin-bottom:16px;">Fixed Top-10 is the main expensive baseline.</div>
+        <div style="font-size:15px;color:var(--col);letter-spacing:1px;margin-bottom:10px;">SCIFACT — more docs hurt ↓</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="width:56px;font-size:20px;color:#777;text-align:right;flex-shrink:0;">Top-3</span>
+          <div style="height:32px;width:52%;background:#5db88a;opacity:.85;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#5db88a;">0.268</span>
         </div>
-        <div style="font-size:18px;color:#c98844;line-height:1.8;padding:12px 16px;border-left:4px solid #c98844;background:rgba(201,136,68,.07);"><b>Key finding:</b> Both F1 and semantic similarity drop as K increases — adding more context actively hurts Mistral on SciFact. Llama-70B is more robust to noise.</div>` },
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="width:56px;font-size:20px;color:#777;text-align:right;flex-shrink:0;">Top-5</span>
+          <div style="height:32px;width:51%;background:#5db88a;opacity:.85;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#5db88a;">0.265</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="width:56px;font-size:20px;color:#777;text-align:right;flex-shrink:0;">Top-7</span>
+          <div style="height:32px;width:50%;background:#5db88a;opacity:.85;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#5db88a;">0.262</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="width:56px;font-size:20px;color:#c98844;text-align:right;flex-shrink:0;">Top-10</span>
+          <div style="height:32px;width:39%;background:#c98844;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#c98844;">0.204 ↓</span>
+        </div>
+        <div style="height:1px;background:rgba(160,120,40,.25);margin-bottom:20px;"></div>
+        <div style="font-size:15px;color:var(--col);letter-spacing:1px;margin-bottom:10px;">HOTPOTQA — more docs help ↑</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="width:56px;font-size:20px;color:#777;text-align:right;flex-shrink:0;">Top-3</span>
+          <div style="height:32px;width:43%;background:#c98844;opacity:.85;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#c98844;">0.410</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="width:56px;font-size:20px;color:#777;text-align:right;flex-shrink:0;">Top-5</span>
+          <div style="height:32px;width:49%;background:#c98844;opacity:.9;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#c98844;">0.467</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="width:56px;font-size:20px;color:#777;text-align:right;flex-shrink:0;">Top-7</span>
+          <div style="height:32px;width:53%;background:#5db88a;opacity:.9;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#5db88a;">0.507</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="width:56px;font-size:20px;color:#5db88a;text-align:right;flex-shrink:0;">Top-10</span>
+          <div style="height:32px;width:55%;background:#5db88a;flex-shrink:0;border-radius:3px;"></div>
+          <span style="font-size:20px;color:#5db88a;">0.516 ↑</span>
+        </div>` },
       { html: `
         <span class="big-line" style="font-size:28px;">Heuristic Rules vs Fixed Top-10</span>
         <p style="font-size:17px;color:#777;margin-top:6px;margin-bottom:18px;line-height:1.7;">Score-gap formula picks K dynamically — no training, no compression, no safety check. Mistral 7B.</p>
@@ -1428,75 +1421,71 @@ const SECTIONS = [
             <div style="display:flex;align-items:center;padding:6px 0;border-top:1px solid rgba(160,120,40,.1);"><div style="flex:1;font-size:16px;color:#777;">Tokens</div><div style="width:86px;text-align:center;font-size:24px;color:#5db88a;">1,073</div><div style="width:86px;text-align:center;font-size:24px;color:#c98844;">1,762</div></div>
           </div>
         </div>
-        <div style="font-size:18px;color:#5db88a;line-height:1.8;padding:10px 16px;border-left:4px solid #5db88a;background:rgba(93,184,138,.05);">Simple rules beat the expensive baseline in 2 of 3 datasets — with zero training data. HotpotQA is the exception: multi-hop queries need more context.</div>` }
+        <div style="font-size:17px;color:#666;line-height:1.8;padding:12px 16px;border-left:4px solid #5db88a;background:rgba(93,184,138,.05);">On SciFact and BioASQ, the top-ranked document usually scores much higher than the rest — that gap is a reliable signal that the answer is concentrated in a small set. Sending fewer, more relevant docs removes noise. On HotpotQA, the answer requires chaining facts across documents, so no single doc stands out and the gap signal is weak — more context is genuinely necessary.</div>` }
     ]
   },
   {
     id: 'results_safe',
-    nav: '11 · SAFE ADAPTIVE',
+    nav: '11 · SAFE ADAPTIVE vs. TOP-10',
     name: 'VALE THE CAPTAIN',
-    title: '11 · SAFE ADAPTIVE vs FIXED TOP-10',
+    title: 'SAFE ADAPTIVE vs. TOP-10',
     char: 'captain',
     color: '#a07828',
     slides: [{ html: `
-      <div style="text-align:center;margin-bottom:18px;padding:12px;border:2px solid var(--col);background:rgba(160,120,40,.05);">
-        <div style="font-size:48px;color:var(--col);line-height:1.2;">29–74%</div>
-        <div style="font-size:22px;color:var(--text);line-height:1.5;margin-top:4px;">token reduction across all 6 dataset–model combinations</div>
-        <div style="font-size:20px;color:#5db88a;margin-top:6px;"><b>F1 preserved or improved in 5 of 6 settings &nbsp;·&nbsp; Fallback triggers on 0–5% of queries only</b></div>
+      <div style="display:flex;gap:16px;margin-bottom:16px;">
+        <div style="flex:1;text-align:center;padding:16px;border:2px solid var(--col);background:rgba(160,120,40,.05);">
+          <div style="font-size:48px;color:var(--col);line-height:1.1;">29–74%</div>
+          <div style="font-size:16px;color:#777;margin-top:6px;line-height:1.5;">token reduction vs Fixed Top-10<br>across all 6 dataset–model pairs</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:16px;border:2px solid #5db88a;background:rgba(93,184,138,.05);">
+          <div style="font-size:48px;color:#5db88a;line-height:1.1;">5 / 6</div>
+          <div style="font-size:16px;color:#777;margin-top:6px;line-height:1.5;">settings where F1 is preserved<br>or improved</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:16px;border:2px solid var(--col);background:rgba(160,120,40,.05);">
+          <div style="font-size:48px;color:var(--col);line-height:1.1;">0–5%</div>
+          <div style="font-size:16px;color:#777;margin-top:6px;line-height:1.5;">fallback rate — savings are<br>genuine, not illusory</div>
+        </div>
       </div>
-      <table class="result-table">
-        <tr><th>Dataset</th><th>Model</th><th>Fixed F1</th><th>Safe F1</th><th>Fixed Sem</th><th>Safe Sem</th><th>Token Reduction</th><th>Fallback</th></tr>
-        <tr><td>SciFact</td><td>Mistral</td><td class="num">0.204</td><td class="num good">0.253</td><td class="num">0.364</td><td class="num good">0.426</td><td class="num good">73.9%</td><td class="num">5%</td></tr>
-        <tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.262</td><td class="num good">0.265</td><td class="num">0.569</td><td class="num">0.569</td><td class="num good">72.6%</td><td class="num">5%</td></tr>
-        <tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.516</td><td class="num good">0.540</td><td class="num">0.529</td><td class="num good">0.554</td><td class="num good">29.6%</td><td class="num">0%</td></tr>
-        <tr><td>HotpotQA</td><td>Llama-70B</td><td class="num good">0.765</td><td class="num warn">0.737</td><td class="num good">0.768</td><td class="num warn">0.740</td><td class="num good">30.6%</td><td class="num">0%</td></tr>
-        <tr><td>BioASQ</td><td>Mistral</td><td class="num">0.257</td><td class="num good">0.339</td><td class="num">0.606</td><td class="num good">0.758</td><td class="num good">48.3%</td><td class="num">1%</td></tr>
-        <tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">0.774</td><td class="num good">0.779</td><td class="num good">52.3%</td><td class="num">2%</td></tr>
+      <table class="result-table" style="font-size:20px;line-height:1.7;width:auto;margin:60px auto 0;">
+        <tr><th>Dataset</th><th>Model</th><th>F1 (Fixed → Safe)</th><th>Semantic (Fixed → Safe)</th><th>Token Reduction</th><th>Fallback</th></tr>
+        <tr style="border-bottom:1px solid rgba(160,120,40,.15);">
+          <td>SciFact</td><td>Mistral</td>
+          <td class="num">0.204 → <b class="good">0.253</b></td>
+          <td class="num">0.364 → <b class="good">0.426</b></td>
+          <td class="num good">73.9%</td><td class="num">5%</td>
+        </tr>
+        <tr style="border-bottom:2px solid rgba(160,120,40,.25);">
+          <td>SciFact</td><td>Llama-70B</td>
+          <td class="num">0.262 → <b class="good">0.265</b></td>
+          <td class="num">0.569 → <b style="color:#777;">0.569</b></td>
+          <td class="num good">72.6%</td><td class="num">5%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(160,120,40,.15);">
+          <td>HotpotQA</td><td>Mistral</td>
+          <td class="num">0.516 → <b class="good">0.540</b></td>
+          <td class="num">0.529 → <b class="good">0.554</b></td>
+          <td class="num good">29.6%</td><td class="num">0%</td>
+        </tr>
+        <tr style="border-bottom:2px solid rgba(160,120,40,.25);">
+          <td>HotpotQA</td><td>Llama-70B</td>
+          <td class="num">0.765 → <b class="warn">0.737</b></td>
+          <td class="num">0.768 → <b class="warn">0.740</b></td>
+          <td class="num good">30.6%</td><td class="num">0%</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(160,120,40,.15);">
+          <td>BioASQ</td><td>Mistral</td>
+          <td class="num">0.257 → <b class="good">0.339</b></td>
+          <td class="num">0.606 → <b class="good">0.758</b></td>
+          <td class="num good">48.3%</td><td class="num">1%</td>
+        </tr>
+        <tr>
+          <td>BioASQ</td><td>Llama-70B</td>
+          <td class="num">0.344 → <b style="color:#777;">0.342</b></td>
+          <td class="num">0.774 → <b class="good">0.779</b></td>
+          <td class="num good">52.3%</td><td class="num">2%</td>
+        </tr>
       </table>
-      <div style="margin-top:12px;font-size:18px;color:var(--col);line-height:1.8;padding:10px 14px;border-left:4px solid var(--col);background:rgba(160,120,40,.07);">The one orange row (HotpotQA / Llama-70B): Safe Adaptive retains <b>96.3% of Fixed Top-10 F1</b> while saving 30.6% of tokens. All token counts are provider-reported.</div>` }]
-  },
-  {
-    id: 'safe_vs_baselines',
-    nav: '11 · SAFE VS BASELINES',
-    name: 'VALE THE CAPTAIN',
-    title: '11 · SAFE ADAPTIVE VS BASELINES',
-    char: 'captain',
-    color: '#a07828',
-    slides: [
-      { html: `
-      <span class="kicker">SAFE ADAPTIVE VS FIXED TOP-10</span>
-      <table class="result-table" style="font-size:18px;line-height:1.55;margin-top:10px;">
-        <tr><th>Dataset</th><th>Model</th><th>Fixed F1</th><th>Safe F1</th><th>Safe Tokens</th><th>Reduction</th></tr>
-        <tr><td>SciFact</td><td>Mistral</td><td class="num">0.204</td><td class="num good">0.253</td><td class="num">985</td><td class="num good">73.9%</td></tr>
-        <tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.262</td><td class="num good">0.265</td><td class="num">933</td><td class="num good">72.6%</td></tr>
-        <tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.516</td><td class="num good">0.540</td><td class="num">1,240</td><td class="num good">29.6%</td></tr>
-        <tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.765</td><td class="num warn">0.737</td><td class="num">1,066</td><td class="num good">30.6%</td></tr>
-        <tr><td>BioASQ</td><td>Mistral</td><td class="num">0.257</td><td class="num good">0.339</td><td class="num">2,011</td><td class="num good">48.3%</td></tr>
-        <tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.344</td><td class="num">0.342</td><td class="num">1,668</td><td class="num good">52.3%</td></tr>
-      </table>
-      <div class="slide-note">This is the main efficiency result: Safe Adaptive cuts 29.6–73.9% of tokens versus Fixed Top-10 while preserving or improving F1 in 5 of 6 dataset–model pairs. The only F1 drop is HotpotQA with Llama-70B, where it still retains 96.3% of Fixed Top-10 F1.</div>
-      <ul style="margin-top:14px;">
-        <li>SciFact and BioASQ show the largest savings because useful evidence is concentrated.</li>
-        <li>HotpotQA saves less because multi-hop questions need broader evidence coverage.</li>
-      </ul>` },
-      { html: `
-      <span class="kicker">SAFE ADAPTIVE VS HEURISTIC RULES</span>
-      <table class="result-table" style="font-size:18px;line-height:1.55;margin-top:10px;">
-        <tr><th>Dataset</th><th>Model</th><th>Heur. F1</th><th>Safe F1</th><th>Token Change</th><th>Takeaway</th></tr>
-        <tr><td>SciFact</td><td>Mistral</td><td class="num">0.265</td><td class="num">0.253</td><td class="num good">-62.9%</td><td>Much cheaper</td></tr>
-        <tr><td>SciFact</td><td>Llama-70B</td><td class="num">0.266</td><td class="num">0.265</td><td class="num good">-58.2%</td><td>Same quality</td></tr>
-        <tr><td>HotpotQA</td><td>Mistral</td><td class="num">0.482</td><td class="num good">0.540</td><td class="num warn">+15.5%</td><td>Higher F1</td></tr>
-        <tr><td>HotpotQA</td><td>Llama-70B</td><td class="num">0.708</td><td class="num good">0.737</td><td class="num warn">+12.8%</td><td>Higher F1</td></tr>
-        <tr><td>BioASQ</td><td>Mistral</td><td class="num">0.333</td><td class="num good">0.339</td><td class="num good">-21.4%</td><td>Better + cheaper</td></tr>
-        <tr><td>BioASQ</td><td>Llama-70B</td><td class="num">0.349</td><td class="num">0.342</td><td class="num good">-21.5%</td><td>Cheaper</td></tr>
-      </table>
-      <div class="slide-note">Heuristic Rules is the strong simple adaptive baseline: it changes budget from retrieval score gaps but still sends full documents. Safe Adaptive adds compact evidence selection and answer-aware fallback.</div>
-      <ul style="margin-top:14px;">
-        <li>On SciFact, Safe Adaptive is slightly lower in F1 but dramatically cheaper.</li>
-        <li>On HotpotQA, it spends modestly more than Heuristic Rules but buys a clear F1 gain.</li>
-        <li>On BioASQ, it is cheaper, and with Mistral it is also higher F1.</li>
-      </ul>` }
-    ]
+      <div style="margin-top:12px;font-size:16px;color:#777;line-height:1.7;">Only orange row: HotpotQA / Llama-70B still retains <b style="color:var(--col);">96.3% of Fixed Top-10 F1</b> while saving 30.6% of tokens. HotpotQA saves less overall because multi-hop questions need broader evidence coverage.</div>` }]
   },
   {
     id: 'cross_encoder',
