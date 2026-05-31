@@ -20,7 +20,7 @@ given the question and the retrieved evidence shown.
 **Double-click `index.html`** to open the form in your browser.
 
 You will see:
-- Tabs across the top of the sidebar: **All (95) · SciFact (40) · HotpotQA (15) · BioASQ (40)**
+- Tabs across the top of the sidebar: **All (95) · SciFact (40) · HotpotQA (40) · BioASQ (40)**
 - A list of items on the left; click any item to open it
 - The annotation panel on the right
 
