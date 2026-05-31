@@ -21,11 +21,20 @@ The key model:
 
 Safe Adaptive Context works like this:
 
+<<<<<<< HEAD
 1. Start with compact adaptive evidence.
 2. Generate a first answer.
 3. Check if the answer looks weak or unsupported.
 4. If weak, expand to full top-10 documents and generate again.
 5. Count the full cost, including the first pass and fallback pass.
+=======
+1. Choose an adaptive document budget.
+2. Try those documents as compact evidence.
+3. Score whether the answer looks weak or unsupported.
+4. If weak, retry the same documents without compression.
+5. If still weak, expand to more documents.
+6. Count the full cost, including every attempt.
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
 This is the real model we are evaluating, not a toy imitation.
 """
@@ -52,17 +61,31 @@ from adaptive_retrieval.learned_budget import (
     BUDGETS,
     build_examples,
     evaluate_learned_budget,
+<<<<<<< HEAD
     split_queries,
     summarize as summarize_retrieval_metrics,
     train_centroid_model,
 )
 from adaptive_retrieval.metrics import answer_coverage, ndcg_at_k, token_f1
 from adaptive_retrieval.text import estimate_tokens, tokenize, build_idf, build_index, tfidf_vector, build_doc_vectors
+=======
+    extract_features,
+    split_queries,
+    sufficiency_risk_score,
+    summarize as summarize_retrieval_metrics,
+    train_centroid_model,
+)
+from adaptive_retrieval.metrics import answer_coverage, ndcg_at_k, semantic_similarity, token_f1
+from adaptive_retrieval.text import estimate_tokens, tokenize
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
 PROMPT_STYLES = {"default", "concise", "anchor"}
 
 ANSWER_AWARE_FALLBACK_MODE = "answer_aware_fallback"
+<<<<<<< HEAD
 PRE_GENERATION_ROUTING_MODE = "pre_generation_routing"
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
 WEAK_ANSWER_PHRASES = {
     "insufficient evidence",
@@ -79,6 +102,7 @@ WEAK_ANSWER_PHRASES = {
     "unknown",
 }
 
+<<<<<<< HEAD
 NEGATION_OR_COMPLEXITY_TERMS = {
     "absent",
     "absence",
@@ -99,6 +123,8 @@ NEGATION_OR_COMPLEXITY_TERMS = {
     "without",
 }
 
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 RISK_STOPWORDS = {
     "a",
     "an",
@@ -138,12 +164,17 @@ RISK_STOPWORDS = {
 @dataclass(frozen=True)
 class LLMConfig:
     # Model name used by the remote LLM API.
+<<<<<<< HEAD
     model: str = "mistral"
+=======
+    model: str = "gpt-4o-mini"
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     # Temperature is kept at zero so repeated runs are easier to compare.
     temperature: float = 0.0
     # Upper bound on generated answer length. This keeps completion-token cost controlled.
     max_output_tokens: int = 220
     # Local models can be slow, especially with long fixed_10 prompts.
+<<<<<<< HEAD
     request_timeout_seconds: int = 30000
      # 👇 Ollama OpenAI-compatible endpoint
     api_url: str = "http://localhost:11434/v1/chat/completions"
@@ -153,6 +184,17 @@ class LLMConfig:
     require_api_key: bool = False
     # ⚠️ IMPORTANT: turn this OFF or it will skip real calls
     dry_run: bool = False
+=======
+    request_timeout_seconds: int = 300
+    # API URL for OpenAI-compatible chat-completions providers.
+    api_url: str = "https://api.openai.com/v1/chat/completions"
+    # Environment variable that stores the API key. Ollama can leave this unset.
+    api_key_env: str = "OPENAI_API_KEY"
+    # Local providers such as Ollama do not require an Authorization header.
+    require_api_key: bool = True
+    # Dry-run mode avoids network calls and uses a simple extractive answer instead.
+    dry_run: bool = True
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     # Compression controls how much of each selected document is shown to the answer model.
     compression_mode: str = "full"
     # Prompt style controls the answer format without changing retrieval/context selection.
@@ -191,6 +233,11 @@ class LLMRunRow:
     answer_f1: float
     # Reference-answer term coverage by the generated answer.
     answer_coverage: float
+<<<<<<< HEAD
+=======
+    # Meaning similarity between generated answer and reference answer.
+    semantic_similarity: float
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     # nDCG@10 of the documents that enter the prompt/context.
     ndcg_at_10: float
     # MRR@10 of the documents that enter the prompt/context.
@@ -277,9 +324,17 @@ def build_prompt(query: Query, selected_docs: list[Document], prompt_style: str 
     if prompt_style == "concise":
         return (
             "Use only the evidence below to answer the question.\n"
+<<<<<<< HEAD
             "Write one short answer sentence.\n"
             "Use the same key terms as the evidence when possible.\n"
             "Do not explain your reasoning.\n"
+=======
+            "Write only the final answer.\n"
+            "Use as few words as possible, usually 1 to 5 words.\n"
+            "Use the same key terms as the evidence when possible.\n"
+            "Do not explain your reasoning.\n"
+            "Do not repeat the question.\n"
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
             "If the evidence does not answer the question, write exactly: insufficient evidence.\n\n"
             f"Question:\n{query.text}\n\n"
             f"Evidence:\n{context}\n\n"
@@ -527,7 +582,10 @@ def call_openai_chat(prompt: str, config: LLMConfig) -> GeneratedAnswer:
             },
         ],
     }
+<<<<<<< HEAD
 
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
@@ -648,49 +706,286 @@ def overlap_ratio(left: set[str], right: set[str]) -> float:
     return len(left & right) / len(left)
 
 
+<<<<<<< HEAD
 def answer_needs_fallback(query: Query, answer: str, selected_docs: list[Document]) -> tuple[bool, str]:
     """Return whether the compact answer looks risky enough to expand context.
 
     This is intentionally heuristic and cheap: a deployable controller cannot use
     gold labels, so it looks for signals available at runtime only.
+=======
+def answer_risk_score(query: Query, answer: str, selected_docs: list[Document]) -> tuple[int, list[str]]:
+    """Score whether an answer looks risky using only runtime information.
+
+    This does not look at the gold answer. It only uses:
+    - the query
+    - the selected context
+    - the answer generated by the LLM
+
+    The score is simple on purpose:
+    more weak signals = more reason to expand context.
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     """
     cleaned_answer = answer.strip()
     lowered_answer = cleaned_answer.lower()
     if not cleaned_answer:
+<<<<<<< HEAD
         return True, "empty_answer"
 
     for phrase in WEAK_ANSWER_PHRASES:
         if phrase in lowered_answer:
             return True, f"weak_phrase:{phrase}"
+=======
+        return 10, ["empty_answer"]
+
+    risk = 0
+    reasons = []
+    for phrase in WEAK_ANSWER_PHRASES:
+        if phrase in lowered_answer:
+            risk += 3
+            reasons.append(f"weak_phrase:{phrase}")
+            break
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
     answer_terms = content_word_set(cleaned_answer)
     query_terms = content_word_set(query.text)
     context_terms = content_word_set(" ".join(doc.text for doc in selected_docs))
 
+<<<<<<< HEAD
     # Very short answers are often refusals, fragments, or underspecified outputs.
     if len(answer_terms) < 5:
         return True, "very_short_answer"
 
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     # If the answer uses terms that barely appear in the provided evidence, it may
     # be hallucinating or failing to anchor on the compact snippets.
     answer_context_overlap = overlap_ratio(answer_terms, context_terms)
     if answer_context_overlap < 0.08:
+<<<<<<< HEAD
         return True, "low_answer_context_overlap"
+=======
+        risk += 3
+        reasons.append("low_answer_context_overlap")
+
+    # If the selected context does not cover much of the query vocabulary, the
+    # compressed evidence may be missing part of the question.
+    context_query_coverage = overlap_ratio(query_terms, context_terms)
+    if context_query_coverage < 0.35:
+        risk += 2
+        reasons.append("low_context_query_coverage")
+
+    # Short answers are common in QA datasets such as HotpotQA: names, places,
+    # years, and yes/no answers can be correct. Only treat a short answer as risky
+    # when it also has weak grounding in the selected context.
+    if len(answer_terms) < 5 and answer_context_overlap < 0.20:
+        risk += 2
+        reasons.append("short_answer_with_weak_context_overlap")
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
     # If the answer barely touches the query vocabulary, it may be too generic.
     answer_query_overlap = overlap_ratio(query_terms, answer_terms)
     if answer_query_overlap < 0.04:
+<<<<<<< HEAD
         return True, "low_answer_query_overlap"
+=======
+        risk += 1
+        reasons.append("low_answer_query_overlap")
+
+    # Very long answers are often bad for short-answer QA datasets. This is only
+    # a soft signal because scientific datasets may need longer answers.
+    if len(answer_terms) > 24 and answer_context_overlap < 0.90:
+        risk += 1
+        reasons.append("verbose_answer")
+
+    return risk, reasons
+
+
+def answer_needs_fallback(query: Query, answer: str, selected_docs: list[Document]) -> tuple[bool, str]:
+    """Return whether the answer is risky enough to expand context."""
+    risk, reasons = answer_risk_score(query, answer, selected_docs)
+    if risk >= 3:
+        return True, ",".join(reasons)
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
     return False, ""
 
 
+<<<<<<< HEAD
+=======
+def short_answer_pre_generation_budget(
+    query: Query,
+    ranked_docs: list[tuple[Document, float]],
+    sequential_budget: int,
+) -> int:
+    """Choose one concise-QA budget before calling the LLM.
+
+    This is cheaper than answer-level fallback because it avoids paying for a
+    failed first generation. For short-answer QA, keep full documents, but
+    slightly reduce budget 8 to budget 7 when top-7 already looks sufficient.
+    """
+    budget = min(max(sequential_budget, 3), 10)
+
+    if budget == 8:
+        features = extract_features(query, ranked_docs)
+        risk_7 = sufficiency_risk_score(query, features, ranked_docs, 7)
+        if risk_7 <= 0.50:
+            return 7
+
+    return budget
+
+
+def short_answer_needs_fallback(query: Query, answer: str, selected_docs: list[Document]) -> tuple[bool, str]:
+    """Risk check for short exact answers.
+
+    Keep this deliberately soft. Strong grounding checks after generation can
+    improve quality, but they require a second LLM call and can remove token
+    savings. Here we only expand for clearly broken answer shapes.
+    """
+    cleaned_answer = answer.strip()
+    if not cleaned_answer:
+        return True, "empty_answer"
+
+    answer_terms = content_word_set(cleaned_answer)
+    context_terms = content_word_set(" ".join(doc.text for doc in selected_docs))
+    answer_context_overlap = overlap_ratio(answer_terms, context_terms)
+
+    if len(answer_terms) > 18 and answer_context_overlap < 0.80:
+        return True, "verbose_short_answer"
+
+    return False, ""
+
+
+def title_from_doc_id(doc_id: str) -> str:
+    """Return the readable title part used by converted paragraph datasets."""
+    return doc_id.split("::")[-1]
+
+
+def has_number(text: str) -> bool:
+    return bool(re.search(r"\d", text))
+
+
+def capitalized_terms(text: str) -> set[str]:
+    return set(re.findall(r"\b[A-Z][a-zA-Z0-9'’-]+\b", text))
+
+
+def sentence_pack_score(
+    query: Query,
+    doc: Document,
+    sentence: str,
+    doc_score: float,
+    top_score: float,
+) -> float:
+    """Score a sentence for short-answer QA packing."""
+    query_terms = content_word_set(query.text)
+    sentence_terms = content_word_set(sentence)
+    title_terms = content_word_set(title_from_doc_id(doc.doc_id))
+
+    overlap = len(query_terms & sentence_terms)
+    title_overlap = len(query_terms & title_terms)
+    entity_bonus = min(3, len(capitalized_terms(sentence))) * 0.15
+    number_bonus = 0.25 if has_number(sentence) else 0.0
+    relevance = doc_score / top_score if top_score > 0 else 0.0
+
+    return (2.0 * relevance) + (1.2 * overlap) + (0.8 * title_overlap) + entity_bonus + number_bonus
+
+
+def grouped_sentence_pack(units: list[tuple[str, str, str]]) -> list[Document]:
+    """Group selected sentence units back into compact pseudo-documents."""
+    by_doc: dict[str, list[str]] = {}
+    order: list[str] = []
+
+    for doc_id, title, sentence in units:
+        if doc_id not in by_doc:
+            by_doc[doc_id] = [title]
+            order.append(doc_id)
+        if sentence not in by_doc[doc_id]:
+            by_doc[doc_id].append(sentence)
+
+    return [
+        Document(doc_id=doc_id, text=". ".join(by_doc[doc_id]))
+        for doc_id in order
+    ]
+
+
+def token_budget_greedy_pack(
+    query: Query,
+    ranked_docs: list[tuple[Document, float]],
+    token_budget: int = 950,
+    pool_size: int = 10,
+    force_first_per_doc: bool = False,
+) -> list[Document]:
+    """Build a sentence-level context pack for short-answer / multi-hop QA.
+
+    This keeps broad top-10 retrieval coverage available and compresses inside
+    that pool. Sentences are selected by utility per token.
+    """
+    pool = ranked_docs[:pool_size]
+    top_score = pool[0][1] if pool and pool[0][1] > 0 else 1.0
+    candidates = []
+
+    for rank, (doc, doc_score) in enumerate(pool, start=1):
+        title = title_from_doc_id(doc.doc_id)
+        for index, sentence in enumerate(split_sentences(doc.text)):
+            score = sentence_pack_score(query, doc, sentence, doc_score, top_score)
+            token_len = max(1, estimate_tokens(sentence))
+            utility = score / (token_len ** 0.55)
+
+            if index == 0:
+                utility += 0.35
+
+            candidates.append({
+                "doc": doc,
+                "title": title,
+                "sentence": sentence,
+                "utility": utility,
+                "rank": rank,
+                "index": index,
+                "tokens": token_len,
+            })
+
+    selected = []
+    used = set()
+    total = 0
+
+    if force_first_per_doc:
+        for item in candidates:
+            key = (item["doc"].doc_id, item["index"])
+            if item["index"] == 0 and key not in used:
+                cost = estimate_tokens(item["title"]) + item["tokens"] + 4
+                if total + cost <= token_budget:
+                    selected.append(item)
+                    used.add(key)
+                    total += cost
+
+    for item in sorted(candidates, key=lambda item: item["utility"], reverse=True):
+        key = (item["doc"].doc_id, item["index"])
+        if key in used:
+            continue
+
+        cost = estimate_tokens(item["title"]) + item["tokens"] + 4
+        if total + cost > token_budget:
+            continue
+
+        selected.append(item)
+        used.add(key)
+        total += cost
+
+    selected.sort(key=lambda item: (item["rank"], item["index"]))
+    units = [
+        (item["doc"].doc_id, item["title"], item["sentence"])
+        for item in selected
+    ]
+    return grouped_sentence_pack(units)
+
+
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 def answer_aware_fallback_run(
     query: Query,
     ranked_docs: list[tuple[Document, float]],
     sequential_budget: int,
     config: LLMConfig,
 ) -> tuple[GeneratedAnswer, list[Document], bool, str, int, int]:
+<<<<<<< HEAD
     """Generate from compact evidence first, then expand to full top-10 if risky.
 
     The first pass uses the best compressed strategy we found so far:
@@ -831,6 +1126,129 @@ def pre_generation_routing_run(
     return answer, selected_docs, route_to_full, route_label
 
 
+=======
+    """Safe Adaptive Context.
+
+    The model starts cheap and only expands if the answer looks risky.
+
+    Step 1: decide the task style.
+    Step 2: choose a context policy from that task style.
+    Step 3: generate an answer and check if it looks weak.
+    Step 4: expand only when needed.
+
+    This keeps the idea as one model:
+    - short-answer tasks start with the smallest full context, because exact
+      names/dates/places can be lost by compression and distracted by top-10
+    - evidence-heavy tasks use the adaptive budget and try compact evidence
+      first, because full documents can be noisy and expensive
+    - fallback checks if the first choice was too weak
+    - full top-10 is the final safety fallback
+    """
+    # The prompt style tells us the type of task:
+    # concise = short exact answers, so start small and keep exact wording.
+    # default = evidence-style answers, so use adaptive k and compact evidence.
+    short_answer_task = config.prompt_style == "concise"
+    if short_answer_task:
+        # Short-answer / multi-hop tasks should keep broad retrieval coverage,
+        # but full top-10 is expensive. Pack high-utility sentences from top-10
+        # first, and only fall back to full top-10 if the answer is broken.
+        stages = [
+            ("top_10_token_budget_pack", 10, "token_budget_greedy_pack"),
+            ("top_10_full", 10, "full"),
+        ]
+    else:
+        first_budget = min(max(sequential_budget, 3), 10)
+        stages = [
+            # name, number of docs, compression mode
+            (f"top_{first_budget}_compact", first_budget, "evidence_ngram_neighbors"),
+            (f"top_{first_budget}_full", first_budget, "full"),
+        ]
+        # If the first budget was not already 10, try the next larger compact budget.
+        for candidate in [5, 8, 10]:
+            if candidate > first_budget:
+                stages.append((f"top_{candidate}_compact", candidate, "evidence_ngram_neighbors"))
+                break
+
+        # Full top-10 is always the final safety option.
+        already_has_top_10_full = any(
+            budget == 10 and compression_mode == "full"
+            for _name, budget, compression_mode in stages
+        )
+        if first_budget != 10 and not already_has_top_10_full:
+            stages.append(("top_10_full", 10, "full"))
+
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_tokens = 0
+    total_time_ms = 0
+    token_sources = []
+
+    first_pass_tokens = 0
+    fallback_tokens = 0
+    fallback_used = False
+    fallback_reasons = []
+
+    final_answer = None
+    final_docs = []
+
+    for stage_index, (stage_name, budget, compression_mode) in enumerate(stages):
+        full_docs = [doc for doc, _score in ranked_docs[:budget]]
+        if compression_mode == "full":
+            selected_docs = full_docs
+        elif compression_mode == "token_budget_greedy_pack":
+            selected_docs = token_budget_greedy_pack(query, ranked_docs, token_budget=950, pool_size=10)
+        else:
+            selected_docs = compress_documents(query, full_docs, compression_mode)
+
+        prompt_style = "default" if config.prompt_style == "anchor" else config.prompt_style
+        answer_config = config_for_answer_call(config, compression_mode, prompt_style)
+        answer = generate_answer(query, selected_docs, answer_config)
+
+        total_prompt_tokens += answer.prompt_tokens
+        total_completion_tokens += answer.completion_tokens
+        total_tokens += answer.total_tokens
+        total_time_ms += answer.generation_time_ms
+        token_sources.append(answer.token_source)
+
+        if stage_index == 0:
+            first_pass_tokens = answer.total_tokens
+        else:
+            fallback_used = True
+            fallback_tokens += answer.total_tokens
+
+        final_answer = answer
+        final_docs = selected_docs
+
+        if short_answer_task:
+            should_expand, reason = short_answer_needs_fallback(query, answer.text, selected_docs)
+        else:
+            should_expand, reason = answer_needs_fallback(query, answer.text, selected_docs)
+        if not should_expand or stage_index == len(stages) - 1:
+            if reason:
+                fallback_reasons.append(f"{stage_name}:{reason}")
+            break
+
+        fallback_reasons.append(f"{stage_name}:{reason}")
+
+    combined_answer = GeneratedAnswer(
+        text=final_answer.text,
+        prompt_tokens=total_prompt_tokens,
+        completion_tokens=total_completion_tokens,
+        total_tokens=total_tokens,
+        token_source=combine_token_sources(token_sources),
+        generation_time_ms=total_time_ms,
+    )
+    return (
+        combined_answer,
+        final_docs,
+        fallback_used,
+        ";".join(fallback_reasons),
+        first_pass_tokens,
+        fallback_tokens,
+    )
+
+
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 def combine_token_sources(sources: list[str]) -> str:
     return ",".join(sorted(set(sources)))
 
@@ -864,8 +1282,11 @@ def method_display_name(mode: str, budget_mode: str, compression_mode: str) -> s
     # We keep the technical mode too, but the method name makes tables easier to read.
     if mode == ANSWER_AWARE_FALLBACK_MODE:
         return "Safe Adaptive Context"
+<<<<<<< HEAD
     if mode == PRE_GENERATION_ROUTING_MODE:
         return "Risk-Routed Context"
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
 
     if budget_mode == "no_retrieval":
         return "No Retrieval"
@@ -947,6 +1368,10 @@ def run_llm_budget_experiment(
     dev_ratio: float,
     config: LLMConfig,
     max_eval_queries: int | None = None,
+<<<<<<< HEAD
+=======
+    eval_start_index: int = 0,
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     modes: list[str] | None = None,
     compression_modes: list[str] | None = None,
     oracle_strategy: str = "minimum_sufficient",
@@ -955,26 +1380,38 @@ def run_llm_budget_experiment(
 ) -> tuple[list[LLMRunRow], list[dict[str, object]], list[dict[str, object]]]:
     # Reuse the learned-budget training/evaluation path so the LLM experiment
     # tests exactly the same budget controller as run_learned_budget.py.
+<<<<<<< HEAD
 
     idf = build_idf(documents)
     doc_vectors = build_doc_vectors(documents, idf)
 
     dev_queries, eval_queries = split_queries(queries, dev_ratio)
+=======
+    dev_queries, eval_queries = split_queries(queries, dev_ratio)
+    if eval_start_index:
+        eval_queries = eval_queries[eval_start_index:]
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     if max_eval_queries is not None:
         eval_queries = eval_queries[:max_eval_queries]
     dev_examples, _dev_ranked = build_examples(
         documents,
         dev_queries,
+<<<<<<< HEAD
         idf=idf,
         doc_vectors=doc_vectors,
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
         oracle_strategy=oracle_strategy,
         sufficiency_ratio=sufficiency_ratio,
     )
     eval_examples, eval_ranked = build_examples(
         documents,
         eval_queries,
+<<<<<<< HEAD
         idf=idf,
         doc_vectors=doc_vectors,
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
         oracle_strategy=oracle_strategy,
         sufficiency_ratio=sufficiency_ratio,
     )
@@ -1030,6 +1467,10 @@ def run_llm_budget_experiment(
                         generation_time_ms=answer.generation_time_ms,
                         answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
                         answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+<<<<<<< HEAD
+=======
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
                         ndcg_at_10=context_ndcg_at_10(selected_docs, query),
                         mrr_at_10=context_mrr_at_10(selected_docs, query),
                         selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
@@ -1042,6 +1483,7 @@ def run_llm_budget_experiment(
                 )
                 continue
 
+<<<<<<< HEAD
             if mode == PRE_GENERATION_ROUTING_MODE:
                 answer, selected_docs, routed_full, route_reason = pre_generation_routing_run(
                     query=query,
@@ -1078,6 +1520,8 @@ def run_llm_budget_experiment(
                 )
                 continue
 
+=======
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
             full_docs = selected_docs_for_mode(
                 mode,
                 query,
@@ -1119,6 +1563,10 @@ def run_llm_budget_experiment(
                         generation_time_ms=answer.generation_time_ms,
                         answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
                         answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+<<<<<<< HEAD
+=======
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
                         ndcg_at_10=context_ndcg_at_10(selected_docs, query),
                         mrr_at_10=context_mrr_at_10(selected_docs, query),
                         selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
@@ -1163,6 +1611,10 @@ def summarize_llm_rows(rows: list[LLMRunRow]) -> list[dict[str, object]]:
                 "fallback_tokens": round(average(row.fallback_tokens for row in selected), 6),
                 "answer_f1": round(average(row.answer_f1 for row in selected), 6),
                 "answer_coverage": round(average(row.answer_coverage for row in selected), 6),
+<<<<<<< HEAD
+=======
+                "semantic_similarity": round(average(row.semantic_similarity for row in selected), 6),
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
                 "ndcg_at_10": round(average(row.ndcg_at_10 for row in selected), 6),
                 "mrr_at_10": round(average(row.mrr_at_10 for row in selected), 6),
             }

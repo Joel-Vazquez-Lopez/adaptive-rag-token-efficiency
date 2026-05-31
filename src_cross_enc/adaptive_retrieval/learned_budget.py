@@ -219,6 +219,17 @@ def build_examples(
     idf=None,
 ) -> tuple[list[TrainingExample], dict[str, list[tuple[Document, float]]]]:
 
+<<<<<<< HEAD
+=======
+    # If the final llm_budget.py calls this function without precomputed TF-IDF
+    # objects, build them here. This keeps the cross-encoder pipeline compatible
+    # with the final Safe Adaptive controller.
+    if idf is None:
+        idf = build_idf(documents)
+    if doc_vectors is None:
+        doc_vectors = {doc.doc_id: tfidf_vector(doc.text, idf) for doc in documents}
+
+>>>>>>> f3bcb272f9407d130ab07b67ba0f2651e5f7b44d
     ranked_by_query = {}
     examples = []
 
