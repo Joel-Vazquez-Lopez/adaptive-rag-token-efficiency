@@ -342,9 +342,6 @@ The HTML presentation prototype is:
 rpg_presentation_prototype.html
 ```
 
-Speaker notes and simplified scripts may be stored outside the repository in the
-course workspace, depending on the export used.
-
 ## Project Takeaway
 
 The main lesson is that context size should be treated as a decision, not a
