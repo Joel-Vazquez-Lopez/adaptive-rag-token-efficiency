@@ -1,9 +1,10 @@
-# Adaptive Context Selection for Token-Efficient RAG
+# Safe Adaptive Context and TACER
 
 This repository contains the code, data files, saved outputs, annotation
 materials, and presentation assets for our project:
 
-**Adaptive Context Selection for Token-Efficient Retrieval-Augmented Generation**
+**Safe Adaptive Context and TACER: Task-Aware Evidence Routing for
+Token-Efficient Retrieval-Augmented Generation**
 
 The project asks a focused question:
 
@@ -11,19 +12,24 @@ The project asks a focused question:
 > system decide how much evidence to send to the generator, and in what form,
 > while keeping answer quality close to a fixed Top-10 baseline?
 
-Our main method is **Safe Adaptive Context**. It uses a lightweight controller to
-select and compress retrieved evidence according to the answer type, then expands
-the context only when the first generated answer appears weak or unsupported.
+The repository contains two related context controllers:
+
+- **Safe Adaptive Context**, a lightweight controller that starts with limited
+  evidence and expands when the generated answer appears weak or unsupported.
+- **TACER**, a task-aware extension that routes between compact evidence and
+  safer broader context using retrieval-side and evidence-coverage signals.
 
 ## Main Result
 
-Across SciFact, HotpotQA, and BioASQ with Mistral 7B and Llama-3.3-70B,
-Safe Adaptive Context reduces provider-reported token usage by **29-74%**
-relative to Fixed Top-10 while usually preserving comparable automatic answer
-quality. Fallback remains rare, between **0-5%** on the three main datasets.
+Across five datasets, two generators, and stronger retriever settings, Safe
+Adaptive Context and TACER substantially reduce provider-reported token use while
+preserving most Fixed Top-10 answer quality.
 
-An exploratory ASQA long-form run with Llama-70B reduces tokens by **59.1%**
-relative to Fixed Top-10 while achieving the highest token F1 in that run.
+In the five-dataset external-baseline stress test, Safe Adaptive Context retains
+**99.8%** of Fixed Top-10 F1 with **55.0%** token reduction, while TACER retains
+**99.4%** with **60.4%** token reduction. The contribution is not universal
+quality improvement, but practical quality-preserving efficiency through
+task-aware context control.
 
 ## Contributors
 
@@ -33,7 +39,7 @@ relative to Fixed Top-10 while achieving the highest token F1 in that run.
 - Joel Vazquez
 - Sheraz Ahmad
 
-## What Safe Adaptive Context Does
+## What The System Does
 
 All methods start from the same retrieved candidate pool. The retriever returns
 the top-10 documents with TF-IDF cosine similarity. The systems differ only in
@@ -61,21 +67,23 @@ Safe Adaptive Context has three main parts:
 The goal is not simply to compress every prompt. The goal is to spend context
 where it helps and save tokens where evidence is concentrated.
 
+TACER adds explicit task/evidence routing. It asks whether the query appears to
+need concentrated evidence, distributed multi-hop evidence, or longer synthesis,
+then chooses compact coverage-guided evidence, broader selected context, or
+fallback-enabled expansion.
+
 ## Datasets
 
-The main evaluation uses 100 held-out examples from each dataset:
+The submitted paper uses five datasets with 50 calibration examples and 200
+held-out evaluation examples per dataset:
 
 | Dataset | Task Type | Notes |
 |---|---|---|
 | SciFact | Biomedical claim verification | Gold qrels are original; QA-style reference answers were synthetically generated for answer-level metrics |
 | HotpotQA | Multi-hop question answering | Requires broader evidence coverage |
 | BioASQ | Biomedical factoid QA | Uses concise biomedical answers |
-
-The exploratory evaluation uses:
-
-| Dataset | Task Type | Notes |
-|---|---|---|
-| ASQA | Long-form question answering | Treated as exploratory because long-form quality is harder to judge with lexical overlap alone |
+| MS MARCO | Web passage QA | Often early-answer evidence |
+| ASQA | Ambiguous long-form QA | Requires broader synthesis and careful compression |
 
 SciFact does not provide natural-language QA-style gold answers in the same
 format as the QA datasets. For answer-level metrics only, we generated SciFact
@@ -96,7 +104,27 @@ docs/SCIFACT_LLM_GOLD_REPRODUCIBILITY.md
 | Fixed Top-7 | `fixed_7_full` | Always sends the top 7 full documents |
 | Fixed Top-10 | `fixed_10_full` | Always sends the top 10 full documents; main expensive baseline |
 | Heuristic Rules | `heuristic_rules_full` | Rule-based context controller using retrieval score gaps and query length |
+| Adaptive-k | `adaptive_k_full` | Lightweight score-drop baseline |
+| Adaptive-k (paper) | `adaptive_k_official_full` | Paper-faithful largest-gap/buffer baseline |
+| LLMLingua-2 | `llmlingua2_top10`, `llmlingua2_adaptive_k_official` | External prompt-compression baselines |
+| FLARE-lite | `flare_lite` | Answer-risk expansion baseline |
 | Safe Adaptive Context | `answer_aware_fallback` | Starts compact, checks answer risk, and expands only when needed |
+| TACER | `task_aware_coverage_ultra` | Routes between compact evidence and safer broader context |
+
+## Submitted Paper Artifacts
+
+The submitted paper artifacts are under:
+
+```text
+paper/submitted_groundlm_2026/
+```
+
+Paper-facing summary tables are under:
+
+```text
+saved_results/paper_summary/
+saved_results/publication_stats/
+```
 
 ## Final Results at a Glance
 
