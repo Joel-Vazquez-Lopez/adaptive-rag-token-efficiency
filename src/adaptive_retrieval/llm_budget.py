@@ -68,6 +68,11 @@ PROMPT_STYLES = {"default", "concise", "anchor"}
 
 ANSWER_AWARE_FALLBACK_MODE = "answer_aware_fallback"
 SAFE_ADAPTIVE_V2_MODE = "safe_adaptive_v2"
+ADAPTIVE_K_PAPER_MODE = "adaptive_k_paper"
+ADAPTIVE_K_OFFICIAL_MODE = "adaptive_k_official"
+LLMLINGUA2_TOP10_MODE = "llmlingua2_top10"
+LLMLINGUA2_ADAPTIVE_K_OFFICIAL_MODE = "llmlingua2_adaptive_k_official"
+FLARE_LITE_MODE = "flare_lite"
 COVERAGE_GUIDED_ADAPTIVE_MODE = "coverage_guided_adaptive"
 COVERAGE_GUIDED_ULTRA_MODE = "coverage_guided_ultra"
 TASK_AWARE_COVERAGE_ULTRA_MODE = "task_aware_coverage_ultra"
@@ -132,6 +137,7 @@ def examples_from_rankings(
     return examples
 
 _SENTENCE_EMBEDDER = None
+_LLMLINGUA2_COMPRESSOR = None
 
 
 @dataclass(frozen=True)
@@ -376,6 +382,109 @@ def build_prompt(query: Query, selected_docs: list[Document], prompt_style: str 
         f"Documents:\n{context}\n\n"
         "Answer:"
     )
+
+
+def llmlingua2_compressor():
+    global _LLMLINGUA2_COMPRESSOR
+    if _LLMLINGUA2_COMPRESSOR is not None:
+        return _LLMLINGUA2_COMPRESSOR
+    try:
+        import torch
+        from llmlingua import PromptCompressor
+    except ImportError as error:
+        raise RuntimeError(
+            "LLMLingua-2 baseline requested, but the llmlingua package is not installed. "
+            "Install it with: python -m pip install llmlingua"
+        ) from error
+
+    model_name = os.environ.get(
+        "LLMLINGUA2_MODEL",
+        "microsoft/llmlingua-2-xlm-roberta-large-meetingbank",
+    )
+    device_map = os.environ.get("LLMLINGUA2_DEVICE")
+    if not device_map:
+        if torch.cuda.is_available():
+            device_map = "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            device_map = "mps"
+        else:
+            device_map = "cpu"
+    _LLMLINGUA2_COMPRESSOR = PromptCompressor(
+        model_name=model_name,
+        device_map=device_map,
+        use_llmlingua2=True,
+    )
+    return _LLMLINGUA2_COMPRESSOR
+
+
+def build_prompt_with_context(query: Query, context: str, prompt_style: str) -> str:
+    """Build a generation prompt from an already prepared context string."""
+    if prompt_style == "concise":
+        return (
+            "Use only the evidence below to answer the question.\n"
+            "Write only the final answer.\n"
+            "Use as few words as possible, usually 1 to 5 words.\n"
+            "Use the same key terms as the evidence when possible.\n"
+            "Do not explain your reasoning.\n"
+            "Do not repeat the question.\n"
+            "If the evidence does not answer the question, write exactly: insufficient evidence.\n\n"
+            f"Question:\n{query.text}\n\n"
+            f"Evidence:\n{context}\n\n"
+            "Short answer:"
+        )
+
+    return (
+        "Answer the question using only the provided documents. "
+        "If the documents do not contain enough evidence, say that the evidence is insufficient.\n\n"
+        f"Question:\n{query.text}\n\n"
+        f"Documents:\n{context}\n\n"
+        "Answer:"
+    )
+
+
+def llmlingua2_context_blocks(selected_docs: list[Document], max_block_tokens: int = 360) -> list[str]:
+    """Split retrieved documents into compressor-friendly evidence blocks."""
+    blocks: list[str] = []
+    for index, doc in enumerate(selected_docs, start=1):
+        header = f"[Document {index} | {doc.doc_id}]"
+        sentences = split_sentences(doc.text) or [doc.text]
+        current = header
+        for sentence in sentences:
+            candidate = f"{current}\n{sentence}" if current != header else f"{header}\n{sentence}"
+            if estimate_tokens(candidate) > max_block_tokens and current != header:
+                blocks.append(current)
+                current = f"{header}\n{sentence}"
+            else:
+                current = candidate
+        if current.strip() and current != header:
+            blocks.append(current)
+    return blocks or ["No retrieved evidence."]
+
+
+def compress_context_with_llmlingua2(query: Query, selected_docs: list[Document]) -> str:
+    rate = float(os.environ.get("LLMLINGUA2_RATE", "0.33"))
+    compressor = llmlingua2_compressor()
+    context_blocks = llmlingua2_context_blocks(selected_docs)
+    result = compressor.compress_prompt(
+        context_blocks,
+        question=query.text,
+        rate=rate,
+        iterative_size=128,
+        concate_question=False,
+        keep_first_sentence=1,
+        force_context_number=min(1, len(context_blocks)),
+        force_tokens=["\n", "?", "[", "]", ":", "|"],
+        force_reserve_digit=True,
+        chunk_end_tokens=[".", "\n"],
+    )
+    compressed_prompt = result.get("compressed_prompt")
+    if not isinstance(compressed_prompt, str) or not compressed_prompt.strip():
+        compressed_list = result.get("compressed_prompt_list")
+        if isinstance(compressed_list, list):
+            compressed_prompt = "\n\n".join(str(item) for item in compressed_list if str(item).strip())
+    if not isinstance(compressed_prompt, str) or not compressed_prompt.strip():
+        raise RuntimeError("LLMLingua-2 returned empty compressed context.")
+    return compressed_prompt
 
 
 def split_sentences(text: str) -> list[str]:
@@ -828,6 +937,42 @@ def generate_answer(query: Query, selected_docs: list[Document], config: LLMConf
             generation_time_ms=round((time.perf_counter() - started) * 1000),
         )
     return call_openai_chat(build_prompt(query, selected_docs, config.prompt_style), config)
+
+
+def generate_answer_from_prompt(
+    query: Query,
+    selected_docs: list[Document],
+    prompt: str,
+    config: LLMConfig,
+) -> GeneratedAnswer:
+    if config.dry_run:
+        started = time.perf_counter()
+        answer = dry_run_answer(query, selected_docs)
+        prompt_tokens = estimate_tokens(prompt)
+        completion_tokens = estimate_tokens(answer)
+        return GeneratedAnswer(
+            text=answer,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=prompt_tokens + completion_tokens,
+            token_source="estimated",
+            generation_time_ms=round((time.perf_counter() - started) * 1000),
+        )
+    return call_openai_chat(prompt, config)
+
+
+def generate_llmlingua2_answer(
+    query: Query,
+    selected_docs: list[Document],
+    config: LLMConfig,
+) -> GeneratedAnswer:
+    prompt = build_prompt(query, selected_docs, config.prompt_style)
+    if config.dry_run:
+        compressed_prompt = prompt
+    else:
+        compressed_context = compress_context_with_llmlingua2(query, selected_docs)
+        compressed_prompt = build_prompt_with_context(query, compressed_context, config.prompt_style)
+    return generate_answer_from_prompt(query, selected_docs, compressed_prompt, config)
 
 
 def config_for_answer_call(config: LLMConfig, compression_mode: str, prompt_style: str | None = None) -> LLMConfig:
@@ -3258,6 +3403,94 @@ def safe_adaptive_v2_run(
     )
 
 
+def flare_lite_run(
+    query: Query,
+    ranked_docs: list[tuple[Document, float]],
+    config: LLMConfig,
+) -> tuple[GeneratedAnswer, list[Document], bool, str, int, int]:
+    """FLARE-style orientation baseline for APIs without token uncertainty.
+
+    Official FLARE actively retrieves while generating when the next sentence
+    looks uncertain. Our hosted API path does not expose a comparable token-level
+    uncertainty signal, so this lightweight baseline tests the closest fair
+    control idea inside this codebase: answer from very small evidence first,
+    then expand only if the generated answer looks unsupported by that evidence.
+
+    This should be reported as FLARE-lite / FLARE-style, not as official FLARE.
+    """
+    official_budget = adaptive_k_paper_budget(
+        ranked_docs,
+        max_budget=10,
+        buffer_docs=5,
+        search_fraction=0.9,
+    )
+    official_budget = min(max(official_budget, 3), len(ranked_docs), 10)
+
+    stages: list[tuple[str, int, str]] = [("top_1_full", 1, "full")]
+    if official_budget > 1:
+        stages.append((f"official_adaptive_k_{official_budget}_full", official_budget, "full"))
+    if official_budget < 10 and len(ranked_docs) >= 10:
+        stages.append(("top_10_full", 10, "full"))
+
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_tokens = 0
+    total_time_ms = 0
+    token_sources = []
+
+    first_pass_tokens = 0
+    fallback_tokens = 0
+    fallback_used = False
+    fallback_reasons = []
+    final_answer = None
+    final_docs: list[Document] = []
+
+    for stage_index, (stage_name, budget, compression_mode) in enumerate(stages):
+        selected_docs = [doc for doc, _score in ranked_docs[:budget]]
+        prompt_style = "default" if config.prompt_style == "anchor" else config.prompt_style
+        answer_config = config_for_answer_call(config, compression_mode, prompt_style)
+        answer = generate_answer(query, selected_docs, answer_config)
+
+        total_prompt_tokens += answer.prompt_tokens
+        total_completion_tokens += answer.completion_tokens
+        total_tokens += answer.total_tokens
+        total_time_ms += answer.generation_time_ms
+        token_sources.append(answer.token_source)
+
+        if stage_index == 0:
+            first_pass_tokens = answer.total_tokens
+        else:
+            fallback_used = True
+            fallback_tokens += answer.total_tokens
+
+        final_answer = answer
+        final_docs = selected_docs
+
+        should_expand, reason = answer_needs_fallback(query, answer.text, selected_docs)
+        if not should_expand or stage_index == len(stages) - 1:
+            if reason:
+                fallback_reasons.append(f"{stage_name}:{reason}")
+            break
+        fallback_reasons.append(f"{stage_name}:{reason}")
+
+    combined_answer = GeneratedAnswer(
+        text=final_answer.text,
+        prompt_tokens=total_prompt_tokens,
+        completion_tokens=total_completion_tokens,
+        total_tokens=total_tokens,
+        token_source=combine_token_sources(token_sources),
+        generation_time_ms=total_time_ms,
+    )
+    return (
+        combined_answer,
+        final_docs,
+        fallback_used,
+        ";".join(fallback_reasons),
+        first_pass_tokens,
+        fallback_tokens,
+    )
+
+
 def hybrid_safe_adaptive_run(
     query: Query,
     ranked_docs: list[tuple[Document, float]],
@@ -3309,6 +3542,12 @@ def method_display_name(mode: str, budget_mode: str, compression_mode: str) -> s
         return "Safe Adaptive Context"
     if mode == SAFE_ADAPTIVE_V2_MODE:
         return "Safe Adaptive Context v2"
+    if mode == LLMLINGUA2_TOP10_MODE:
+        return "Fixed Top-10 + LLMLingua-2"
+    if mode == LLMLINGUA2_ADAPTIVE_K_OFFICIAL_MODE:
+        return "Adaptive-k (paper) + LLMLingua-2"
+    if mode == FLARE_LITE_MODE:
+        return "FLARE-lite"
     if mode == COVERAGE_GUIDED_ADAPTIVE_MODE:
         return "Coverage-Guided Safe Adaptive"
     if mode == COVERAGE_GUIDED_ULTRA_MODE:
@@ -3382,6 +3621,34 @@ def adaptive_k_budget(ranked_docs: list[tuple[Document, float]], max_budget: int
     if largest_gap <= 0:
         return min(len(scores), max_budget)
     return gaps.index(largest_gap) + 1
+
+
+def adaptive_k_paper_budget(
+    ranked_docs: list[tuple[Document, float]],
+    max_budget: int = 10,
+    buffer_docs: int = 5,
+    search_fraction: float = 0.9,
+) -> int:
+    """Paper-faithful Adaptive-k cutoff with the paper's fixed buffer.
+
+    Taguchi et al. choose the largest adjacent similarity-score gap, then add
+    a small fixed buffer after the cutoff. They set the buffer to 5 in their
+    experiments and restrict gap search away from the least-relevant tail. This
+    implementation adapts that rule to our top-10 candidate lists.
+    """
+    limit = min(len(ranked_docs), max_budget)
+    if limit <= 1:
+        return limit
+
+    scores = [score for _doc, score in ranked_docs[:limit]]
+    gap_count = max(1, min(limit - 1, math.ceil((limit - 1) * search_fraction)))
+    gaps = [scores[index] - scores[index + 1] for index in range(gap_count)]
+    largest_gap = max(gaps)
+    if largest_gap <= 0:
+        cutoff = limit
+    else:
+        cutoff = gaps.index(largest_gap) + 1
+    return min(limit, cutoff + buffer_docs)
 
 
 def guarded_adaptive_k_budget(
@@ -3468,6 +3735,15 @@ def selected_docs_for_mode(
             budget = 7
     elif mode == "adaptive_k":
         budget = adaptive_k_budget(ranked_docs, max_budget=10)
+    elif mode == ADAPTIVE_K_PAPER_MODE:
+        budget = adaptive_k_paper_budget(ranked_docs, max_budget=10)
+    elif mode == ADAPTIVE_K_OFFICIAL_MODE:
+        budget = adaptive_k_paper_budget(
+            ranked_docs,
+            max_budget=10,
+            buffer_docs=5,
+            search_fraction=0.9,
+        )
     elif mode == GUARDED_ADAPTIVE_K_MODE:
         budget = guarded_adaptive_k_budget(
             query,
@@ -3590,6 +3866,84 @@ def run_llm_budget_experiment(
                         ),
                         budget_mode=ANSWER_AWARE_FALLBACK_MODE,
                         compression_mode="compact_then_full_fallback",
+                        query_id=query.query_id,
+                        docs_used=len(selected_docs),
+                        prompt_tokens=answer.prompt_tokens,
+                        completion_tokens=answer.completion_tokens,
+                        total_tokens=answer.total_tokens,
+                        token_source=answer.token_source,
+                        generation_time_ms=answer.generation_time_ms,
+                        answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
+                        answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
+                        ndcg_at_10=context_ndcg_at_10(selected_docs, query),
+                        mrr_at_10=context_mrr_at_10(selected_docs, query),
+                        selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
+                        answer=answer.text,
+                        fallback_used=fallback_used,
+                        fallback_reason=fallback_reason,
+                        first_pass_tokens=first_pass_tokens,
+                        fallback_tokens=fallback_tokens,
+                    )
+                )
+                continue
+
+            if mode in {LLMLINGUA2_TOP10_MODE, LLMLINGUA2_ADAPTIVE_K_OFFICIAL_MODE}:
+                if mode == LLMLINGUA2_TOP10_MODE:
+                    selected_docs = [doc for doc, _score in ranked_docs[:10]]
+                    compression_mode = "llmlingua2_top10"
+                else:
+                    budget = adaptive_k_paper_budget(
+                        ranked_docs,
+                        max_budget=10,
+                        buffer_docs=5,
+                        search_fraction=0.9,
+                    )
+                    selected_docs = [doc for doc, _score in ranked_docs[:budget]]
+                    compression_mode = "llmlingua2_adaptive_k_official"
+                answer = generate_llmlingua2_answer(query, selected_docs, config)
+                answer_rows.append(
+                    LLMRunRow(
+                        mode=mode,
+                        method_name=method_display_name(mode, mode, compression_mode),
+                        budget_mode=mode,
+                        compression_mode=compression_mode,
+                        query_id=query.query_id,
+                        docs_used=len(selected_docs),
+                        prompt_tokens=answer.prompt_tokens,
+                        completion_tokens=answer.completion_tokens,
+                        total_tokens=answer.total_tokens,
+                        token_source=answer.token_source,
+                        generation_time_ms=answer.generation_time_ms,
+                        answer_f1=round(token_f1(answer.text, query.reference_answer), 6),
+                        answer_coverage=round(answer_coverage(answer.text, query.reference_answer), 6),
+                        semantic_similarity=round(semantic_similarity(answer.text, query.reference_answer), 6),
+                        ndcg_at_10=context_ndcg_at_10(selected_docs, query),
+                        mrr_at_10=context_mrr_at_10(selected_docs, query),
+                        selected_doc_ids=json.dumps([doc.doc_id for doc in selected_docs]),
+                        answer=answer.text,
+                    )
+                )
+                continue
+
+            if mode == FLARE_LITE_MODE:
+                answer, selected_docs, fallback_used, fallback_reason, first_pass_tokens, fallback_tokens = (
+                    flare_lite_run(
+                        query=query,
+                        ranked_docs=ranked_docs,
+                        config=config,
+                    )
+                )
+                answer_rows.append(
+                    LLMRunRow(
+                        mode=FLARE_LITE_MODE,
+                        method_name=method_display_name(
+                            FLARE_LITE_MODE,
+                            FLARE_LITE_MODE,
+                            "answer_triggered_retrieval",
+                        ),
+                        budget_mode=FLARE_LITE_MODE,
+                        compression_mode="answer_triggered_retrieval",
                         query_id=query.query_id,
                         docs_used=len(selected_docs),
                         prompt_tokens=answer.prompt_tokens,

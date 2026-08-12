@@ -57,6 +57,11 @@ def main() -> None:
             "fixed_10",
             "heuristic_rules",
             "adaptive_k",
+            "adaptive_k_paper",
+            "adaptive_k_official",
+            "llmlingua2_top10",
+            "llmlingua2_adaptive_k_official",
+            "flare_lite",
             "guarded_adaptive_k",
             "guarded_predicate_compact",
             "discourse_preserving_compact",
@@ -72,6 +77,11 @@ def main() -> None:
             "fixed_10",
             "heuristic_rules",
             "adaptive_k",
+            "adaptive_k_paper",
+            "adaptive_k_official",
+            "llmlingua2_top10",
+            "llmlingua2_adaptive_k_official",
+            "flare_lite",
             "guarded_adaptive_k",
             "guarded_predicate_compact",
             "discourse_preserving_compact",
@@ -97,6 +107,13 @@ def main() -> None:
     for start in range(args.start_index, end_index, args.batch_size):
         stop = min(start + args.batch_size, end_index)
         batch_dir = args.output_root / f"batch_{start + 1:03d}_{stop:03d}"
+        final_table = batch_dir / "final_table.csv"
+        answers_file = batch_dir / "llm_answers_by_query.csv"
+        if final_table.exists() and answers_file.exists():
+            print(f"\n=== Skipping completed {args.dataset_name} examples {start + 1}-{stop} ===")
+            completed_dirs.append(batch_dir)
+            continue
+
         command = [
             sys.executable,
             str(ROOT / "scripts" / "run_experiment.py"),
